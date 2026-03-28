@@ -1,0 +1,109 @@
+###############################################################################
+# InfoExplorer Agent — Docker Stack
+#
+# Add new agents by:
+#   1. Creating agents/<agent-name>/ with Dockerfile + agent.py + config.yaml
+#   2. Adding a new service block below following the same pattern
+#   3. Attaching it to the "agentic-platform" network
+###############################################################################
+
+networks:
+  agentic-platform:
+    name: agentic-platform
+    driver: bridge
+
+services:
+
+  # ── SearXNG — Bundled Search Engine ─────────────────────────────────────────
+  # Internal only — not exposed outside the stack
+  searxng:
+    image: searxng/searxng:2025.3.20-66b00f1c4
+    container_name: research-searxng
+    restart: unless-stopped
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    networks:
+      - agentic-platform
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/search?format=json&q=test"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── InfoExplorer Agent ──────────────────────────────────────────────────────────
+  # Automated web research & local AI synthesis — configure topics in config.yaml
+  # Dashboard at: http://localhost:8888
+  infoexplorer-agent:
+    build:
+      context: ./agents/explorer
+      dockerfile: Dockerfile
+    container_name: agent-infoexplorer
+    restart: unless-stopped
+    ports:
+      - "${RESEARCH_PORT:-8888}:8888"
+    volumes:
+      - ${REPORTS_DIR:-./reports}:/reports
+      - ./agents/explorer/config.yaml:/app/config.yaml   # writable — schedule changes persist
+      - ./skills:/app/skills                             # writable — skill edits from dashboard persist
+    environment:
+      - SEARXNG_URL=http://research-searxng:8080
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - CONFIG_PATH=/app/config.yaml
+      - PORT=8888
+      - RUN_ON_START=${RUN_ON_START:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - agentic-platform
+    depends_on:
+      searxng:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Future agents — uncomment and fill in when ready ───────────────────────
+
+  # compliance-agent:
+  #   build:
+  #     context: ./agents/compliance
+  #     dockerfile: Dockerfile
+  #   container_name: agent-compliance
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${COMPLIANCE_PORT:-8889}:8888"
+  #   volumes:
+  #     - ${REPORTS_DIR:-./reports}:/reports
+  #     - ./agents/compliance/config.yaml:/app/config.yaml
+  #   environment:
+  #     - SEARXNG_URL=http://research-searxng:8080
+  #     - OLLAMA_URL=${OLLAMA_URL}
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   networks:
+  #     - agentic-platform
+
+  # threat-intel-agent:
+  #   build:
+  #     context: ./agents/threat-intel
+  #     dockerfile: Dockerfile
+  #   container_name: agent-threat-intel
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${THREAT_PORT:-8890}:8888"
+  #   volumes:
+  #     - ${REPORTS_DIR:-./reports}:/reports
+  #     - ./agents/threat-intel/config.yaml:/app/config.yaml
+  #   environment:
+  #     - SEARXNG_URL=http://research-searxng:8080
+  #     - OLLAMA_URL=${OLLAMA_URL}
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   networks:
+  #     - agentic-platform

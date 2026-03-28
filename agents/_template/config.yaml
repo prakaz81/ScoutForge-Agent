@@ -1,0 +1,40 @@
+# ── Agent Template Config ────────────────────────────────────────────────────
+# Copy agents/_template/ to agents/<your-agent-name>/ and customise this file.
+# See docs/adding-agents.md for the full guide.
+
+schedule:
+  frequency: "daily"     # daily | weekly | monthly
+  hour: 7
+  minute: 0
+  timezone: "America/Chicago"
+  day_of_week: "mon"     # used when frequency = weekly  (mon|tue|wed|thu|fri|sat|sun)
+  day: 1                 # used when frequency = monthly (1–28)
+
+research:
+  max_results_per_query: 4
+  time_range: "week"           # day | week | month (SearXNG filter)
+  max_age_months: 3            # articles older than this are excluded
+  fetch_article_content: true  # set false to use snippet only (faster)
+  max_article_chars: 1500
+  dedup_against_last_n_reports: 2
+
+  topics:
+    - area: "Topic Area Name"
+      queries:
+        - "specific search query 1"
+        - "specific search query 2"
+        - "specific search query 3"
+        # Add 6–10 queries per domain for best coverage
+
+report:
+  output_dir: "/reports"
+  agent_name: "My Agent"
+  format: "markdown"
+  executive_summary_points: 7
+  key_insights_points: 6
+  watch_list_points: 4
+
+ollama:
+  model: "llama3.1:8b"
+  num_predict: 4000
+  temperature: 0.3

@@ -1,0 +1,24 @@
+# Environment — never commit secrets
+.env
+
+# Generated reports — user data, not source code
+reports/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Docker build artifacts
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp

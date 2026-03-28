@@ -1,0 +1,40 @@
+# SearXNG settings — bundled for InfoExplorer Agent
+# Docs: https://docs.searxng.org/admin/settings/settings.html
+
+use_default_settings: true
+
+server:
+  # Generate a secret: openssl rand -hex 32
+  secret_key: "change-me-run-openssl-rand-hex-32-and-paste-here"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false          # disable rate limiting — single internal trusted caller
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json              # REQUIRED — agent calls /search?format=json
+
+engines:
+  - name: google
+    engine: google
+    disabled: false
+  - name: bing
+    engine: bing
+    disabled: false
+  - name: duckduckgo
+    engine: duckduckgo
+    disabled: false
+  - name: google news
+    engine: google_news
+    disabled: false
+  - name: bing news
+    engine: bing_news
+    disabled: false
