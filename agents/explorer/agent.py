@@ -517,7 +517,8 @@ def save_report(
     title    = expl_cfg.get("title", expl_cfg["id"])
     topics   = expl_cfg.get("research", {}).get("topics", [])
     time_range = expl_cfg.get("research", {}).get("time_range", "") or "no filter"
-    filename = f"research_brief_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
+    slug     = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")[:30]
+    filename = f"research_brief_{slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
     filepath = reports_dir / filename
     header = (
         f"# {title} Research Brief\n"
@@ -710,13 +711,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <div class="shell">
 
   <!-- Navigation: Topic Tabs + Topic Mgmt button -->
-  <div class="expl-tabs">
-    {% for expl in explorations %}
-    <a href="?expl={{ expl.id }}" class="expl-tab {% if expl.id == active_expl_id %}active{% endif %}">
-      {% if not expl.has_skill %}<span style="color:#f59e0b;font-size:.65rem;vertical-align:middle" title="No skill description set">●</span> {% endif %}{{ expl.title }}
-    </a>
-    {% endfor %}
-    <button class="expl-tab" style="margin-left:auto;border-right:none;color:#2563eb;border-left:1px solid #e5e7eb" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
+  <div style="display:flex;align-items:stretch;gap:8px;margin-bottom:18px">
+    <div class="expl-tabs" style="flex:1;margin-bottom:0">
+      {% for expl in explorations %}
+      <a href="?expl={{ expl.id }}" class="expl-tab {% if expl.id == active_expl_id %}active{% endif %}">
+        {% if not expl.has_skill %}<span style="color:#f59e0b;font-size:.65rem;vertical-align:middle" title="No skill description set">●</span> {% endif %}{{ expl.title }}
+      </a>
+      {% endfor %}
+    </div>
+    <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
   </div>
 
   <!-- Header -->
@@ -1903,8 +1906,9 @@ def research_topic(topic: str, user_context: str = "", expl_id: str | None = Non
     )
     body = call_ollama(prompt)
 
-    slug     = topic.lower()[:40].replace(" ", "_").replace("/", "_")
-    filename = f"topic_{slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
+    expl_slug = re.sub(r"[^a-z0-9]+", "_", expl_cfg.get("title", expl_id or "").lower()).strip("_")[:20] if expl_cfg else ""
+    topic_slug = topic.lower()[:30].replace(" ", "_").replace("/", "_")
+    filename = f"topic_{expl_slug}_{topic_slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md" if expl_slug else f"topic_{topic_slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
     reports_dir.mkdir(parents=True, exist_ok=True)
     filepath = reports_dir / filename
     header = (
