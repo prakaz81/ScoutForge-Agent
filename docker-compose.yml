@@ -17,7 +17,7 @@ services:
   # ── SearXNG — Bundled Search Engine ─────────────────────────────────────────
   # Internal only — not exposed outside the stack
   searxng:
-    image: searxng/searxng:2025.3.20-66b00f1c4
+    image: searxng/searxng:latest
     container_name: research-searxng
     restart: unless-stopped
     volumes:
@@ -46,12 +46,13 @@ services:
       - "${RESEARCH_PORT:-8888}:8888"
     volumes:
       - ${REPORTS_DIR:-./reports}:/reports
-      - ./agents/explorer/config.yaml:/app/config.yaml   # writable — schedule changes persist
-      - ./skills:/app/skills                             # writable — skill edits from dashboard persist
+      - ./agents/explorer/config.yaml:/app/config.yaml   # writable — model changes persist
+      - ./explorations:/app/explorations                 # writable — schedule/skill edits persist
     environment:
       - SEARXNG_URL=http://research-searxng:8080
       - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
       - CONFIG_PATH=/app/config.yaml
+      - EXPLORATIONS_DIR=/app/explorations
       - PORT=8888
       - RUN_ON_START=${RUN_ON_START:-false}
     extra_hosts:
