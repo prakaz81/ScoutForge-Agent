@@ -1455,7 +1455,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <label style="font-size:.72rem;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">Search Queries (one per line)</label>
         <textarea rows="6" style="font-family:monospace;font-size:.78rem" placeholder="Enter search queries, one per line…"
           oninput="_queriesData[${i}].queries=this.value.split('\\n').map(q=>q.trim()).filter(Boolean)"
-        >${escHtml((area.queries||[]).join('\n'))}</textarea>
+        >${escHtml((area.queries||[]).join('\\n'))}</textarea>
       </div>`).join('');
   }
 
