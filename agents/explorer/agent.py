@@ -738,8 +738,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div class="header">
     <span class="header-icon">🔭</span>
     <div>
-      <h1>Agent ScoutForge{% if explorations|length > 1 %} · {{ active_expl_title }}{% endif %}</h1>
-      <div class="header-sub">Automated web research · Local AI synthesis · No cloud · No subscriptions</div>
+      <h1>ScoutForge{% if explorations|length > 1 %} · {{ active_expl_title }}{% endif %}</h1>
+      <div class="header-sub">Agentic curated topic research &amp; intelligence synthesis · Local AI · No cloud · No subscriptions</div>
     </div>
     <span style="display:inline-flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:600;color:#2563eb">🤖 {{ model }}</span>
     <button class="btn btn-link" onclick="openSettingsModal()" title="Settings">⚙️ Settings</button>
