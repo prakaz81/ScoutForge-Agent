@@ -35,22 +35,24 @@ You can also trigger ad-hoc research on any topic, ask questions across all past
 ## Features
 
 - **Multiple independent topics** — create and manage as many research topics as you need from the dashboard
+- **✨ AI-powered topic creation** — describe your goal in 2–3 lines; ScoutForge auto-generates the Skills description and 3 research areas with 4 queries each using the LLM
 - **Full topic management UI** — create, configure, and delete topics without touching config files
 - **Research Queries editor** — add, edit, and remove research areas and their search queries from the browser
 - **Intelligent deduplication** — Ollama compares new findings against previous reports so every brief contains only genuinely new information
 - **Local-first** — Ollama (LLM) and SearXNG (search) run locally; no cloud AI or third-party search APIs needed
-- **Scheduled runs** — Daily, weekly, or monthly; configurable per topic from Settings without restarting
+- **Scheduled runs** — Daily, weekly, or monthly; configurable per topic from Settings → Schedule tab; takes effect immediately without restarting
 - **🔍 Adhoc Topic Search** — Live web search on any topic via a modal; choose depth and target topic; result saved as a report instantly
-- **💬 Ask Reports chatbot** — Chat-style Q&A window with topic selector (All Topics or specific); RAG across recent reports
+- **💬 Ask Reports chatbot** — Chat-style Q&A window with topic selector (All Topics / specific topic / Help Docs); RAG across recent reports
+- **❓ Help Docs chatbot mode** — ask questions about ScoutForge itself; the chatbot answers from the built-in user guide
 - **Per-report Q&A** — Ask any question scoped to a single report (RAG over that report only)
-- **Adjustable report depth** — 1-pager summary through full 5-page intelligence report
-- **Report styles** — Quick Summary (structured bullets), Q&A (question/answer pairs), Blog Post (flowing narrative)
-- **HTML report viewer** — Reports rendered as formatted HTML with style-specific layout
+- **Adjustable report depth** — 1-pager summary through full 3-page intelligence report
+- **Report styles** — Quick Summary (structured bullets), Q&A (question/answer pairs), Blog Post (flowing narrative), Story (chapters with prologue & epilogue)
+- **HTML report viewer** — Reports rendered as formatted HTML with style-specific layout (serif book typography for Story)
 - **Print / Save as PDF** — One-click print button on every report viewer page
 - **Discord notifications** — Per-topic webhook; auto-notify on every scheduled run or send manually per report
 - **Real-time progress tracking** — Dashboard shows exactly which step is running
-- **Prompt injection guardrails** — Two-stage defence (static patterns + LLM semantic check) on every article before it enters the pipeline; also applied to chatbot inputs
-- **Skills descriptions** — Plain-English description per topic shown on the dashboard; empty-skill indicator when not yet configured
+- **Prompt injection guardrails** — Two-stage defence (static patterns + LLM semantic check) on every article before it enters the pipeline; also screens all chatbot inputs
+- **Skills descriptions** — Plain-English description per topic shown on the dashboard; empty-skill indicator (amber dot) when not yet configured
 - **★ Credits modal** — Developed by Prakash Narayanamoorthy; open source stack listed
 
 ---
@@ -152,7 +154,7 @@ Open `http://localhost:8888` in a browser.
 
 ### Navigation
 
-The **top bar** shows the ScoutForge brand on the left and action buttons on the right:
+The **top bar** shows the ScoutForge brand and tagline on the left and action buttons on the right:
 
 | Button | What it does |
 |---|---|
@@ -161,15 +163,14 @@ The **top bar** shows the ScoutForge brand on the left and action buttons on the
 | **⊕ Topic Mgmt** | Create, manage, or delete topics |
 | **❓ Help** | In-app setup and usage guide |
 | **★ Credits** | Developer info + open source stack |
-| **⚙️ Settings** | Per-topic settings modal |
 
-Below the top bar, **topic tabs** let you switch between topics.
+Below the top bar, **topic tabs** let you switch between topics. Directly below the tabs, a context bar shows the topic name and schedule on the left, and **▶ Run Now** and **⚙️ Settings** buttons on the right.
 
 ### Topic Management
 
-- **Create** — Enter a name and click Create. ScoutForge scaffolds the config and skill files immediately; the new tab appears without a restart.
+- **Create** — Enter a topic name and describe your goal (2–3 lines, required). Click **✨ Create & Auto-Configure**. ScoutForge uses the LLM to generate a Skills description and 3 research areas with 4 queries each, then creates the topic immediately. The new tab appears without a restart.
 - **Delete** — Removes the topic, its config, and all its reports.
-- **Configure** — After creating a topic, open it and use ⚙️ Settings to fill in its research queries, skill description, schedule, and report style.
+- **Configure** — After creation, open the topic and use ⚙️ Settings to review or adjust the auto-generated queries, skill description, schedule, and report style.
 
 ### Settings Modal (per topic)
 
@@ -191,9 +192,9 @@ Topics without a skill description show an amber **●** dot in the nav tab and 
 | Section | What It Does |
 |---|---|
 | **Last Run** | Status badge, timestamp, report name, stats (gathered / unique / deduped) |
-| **Research Run** | Trigger full research now; real-time step-by-step progress while running |
-| **💬 Ask Reports** | Chatbot window — select All Topics or a specific topic, ask any question, get AI answers from past reports |
-| **Intelligence Reports** | All saved reports with type badges, view button, per-report chat, Discord send, delete |
+| **Research Running** | Progress card — appears automatically while a run is in progress with step-by-step status |
+| **💬 Ask Reports** | Chatbot window — select All Topics, a specific topic, or Help Docs; ask any question; answers drawn from past reports or the built-in guide |
+| **Intelligence Reports** | All saved reports with style badges, view button, per-report chat, Discord send, delete |
 
 ### Adhoc Topic Search
 
@@ -201,11 +202,12 @@ Click **🔍 Adhoc Search** in the top bar to open the modal. Enter a topic, opt
 
 ### Ask Reports Chatbot
 
-The **💬 Ask Reports** panel is a chat-style window. Use the dropdown to search:
+The **💬 Ask Reports** panel is a chat-style window. Use the dropdown to select:
 - **All Topics** — searches the 3 most recent reports from every topic (up to 8 total)
 - **Specific topic** — searches the 5 most recent reports from that topic
+- **❓ Help Docs** — answers questions about ScoutForge itself from the built-in user guide
 
-Questions and answers appear as conversation bubbles. Example: *"What new AI security incidents were reported this month across all topics?"*
+Questions and answers appear as conversation bubbles. All inputs are screened by prompt-injection guardrails before reaching the LLM. Example: *"What new AI security incidents were reported this month across all topics?"*
 
 ### Report Viewer
 
@@ -213,6 +215,7 @@ Click the 📄 icon next to any report to open the full HTML viewer with style-s
 - **Quick Summary** — structured sections with headings and bullet points
 - **Q&A** — question cards with answer blocks and source links
 - **Blog Post** — flowing narrative with prose layout
+- **Story** — narrative chapters with prologue and epilogue; serif book typography
 
 The viewer includes a **🖨 Print / Save PDF** button and a **Raw Markdown** link.
 
@@ -273,7 +276,7 @@ schedule:
   timezone: "Asia/Kolkata"
 
 report_depth: 1            # 1 | 2 | 3
-report_style: "summary"    # summary | qa | blog
+report_style: "summary"    # summary | qa | blog | story
 
 discord_webhook: ""
 discord_auto_notify: false

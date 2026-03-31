@@ -1492,7 +1492,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:20px">
           <strong style="color:#1d4ed8">What is ScoutForge?</strong><br>
-          A self-hosted research agent that automatically monitors any topic you define, searches the web across multiple query angles, deduplicates findings against past reports, and synthesises intelligence briefs using a local LLM — all running on your machine with no cloud dependencies.
+          A self-hosted research agent that automatically monitors any topic you define, searches the web across multiple query angles, deduplicates findings against past reports, and synthesises intelligence briefs using a local LLM — all running on your machine with no cloud dependencies. No API keys. No subscriptions.
         </div>
 
         <div style="display:flex;flex-direction:column;gap:12px">
@@ -1502,36 +1502,49 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:4px">
               <li><strong>Docker Desktop</strong> — must be running on your Mac</li>
               <li><strong>Ollama</strong> — installed and running on the Mac host (<code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">brew install ollama</code> or <a href="https://ollama.com" target="_blank" style="color:#2563eb">ollama.com</a>)</li>
-              <li><strong>A model pulled in Ollama</strong> — default is <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">llama3.1:8b</code><br>
-                Pull it: <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">ollama pull llama3.1:8b</code></li>
+              <li><strong>A model pulled in Ollama</strong> — default is <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">llama3.1:8b</code> — pull with:<br>
+                <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">ollama pull llama3.1:8b</code></li>
             </ul>
           </div>
 
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">② Start the stack</div>
-            <code style="background:#111827;color:#e5e7eb;border-radius:8px;padding:10px 14px;display:block;font-size:.82rem">cd ScoutForge<br>./run.sh setup    # first time only — builds images &amp; starts containers<br>./run.sh start    # subsequent starts</code>
+            <code style="background:#111827;color:#e5e7eb;border-radius:8px;padding:10px 14px;display:block;font-size:.82rem">cd ScoutForge<br>./run.sh setup    # first time — generates keys, builds &amp; starts<br>./run.sh start    # subsequent starts</code>
+            Then open <strong>http://localhost:8888</strong>
           </div>
 
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">③ Create your first topic</div>
-            Click <strong>⊕ Topic Mgmt</strong> in the nav bar → enter a name → <strong>Create</strong>.<br>
-            The new topic tab appears immediately. Click it to open it.
+            Click <strong>⊕ Topic Mgmt</strong> in the top bar → enter a <strong>name</strong> and a <strong>goal description</strong> (2–3 sentences about what you want to monitor) → click <strong>✨ Create &amp; Auto-Configure</strong>.<br>
+            <span style="font-size:.82rem;color:#6b7280">ScoutForge uses the goal to auto-generate a Skills description and initial research queries via the LLM (~30 seconds). The new topic tab appears immediately.</span>
           </div>
 
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">④ Configure your topic</div>
-            Open <strong>⚙️ Settings</strong> on the topic page:<br>
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">④ Review &amp; refine</div>
+            Click <strong>⚙️ Settings</strong> (below the topic tabs) to review auto-generated content:<br>
             <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
-              <li><strong>📋 Skills</strong> — describe what this topic monitors (shown as a banner on the page)</li>
-              <li><strong>🔍 Research Queries</strong> — add research areas and their search queries</li>
-              <li><strong>⚙ Topic Settings</strong> — set time range, article age filter, and Discord webhook</li>
-              <li><strong>📅 Schedule</strong> (main page) — set how often to run automatically</li>
+              <li><strong>📋 Skills</strong> — the AI-drafted description (edit as needed)</li>
+              <li><strong>🔍 Research Queries</strong> — 3 auto-generated areas × 4 queries each (add, edit, or remove)</li>
+              <li><strong>⚙ Topic Settings</strong> — report depth, style, dedup window, Discord webhook</li>
+              <li><strong>📅 Schedule</strong> — set when automated runs fire (daily/weekly/monthly)</li>
             </ul>
           </div>
 
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">⑤ Run your first research brief</div>
-            Click <strong>▶ Run Full Research Now</strong>. The run takes 4–10 minutes depending on the number of queries and your Ollama model. Progress is shown live. When done, the report appears in the Intelligence Reports list.
+            Click <strong>▶ Run Now</strong> (below the topic tabs). The run takes 4–10 minutes. A live progress card appears while running. When done, the report appears in the Intelligence Reports list on the right.
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Top bar quick reference</div>
+            <table style="width:100%;font-size:.8rem;border-collapse:collapse">
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🤖 Model Connected</td><td style="padding:4px 8px;color:#6b7280">Shows the active Ollama model</td></tr>
+              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🔍 Adhoc Search</td><td style="padding:4px 8px;color:#6b7280">One-off live research on any topic</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">⊕ Topic Mgmt</td><td style="padding:4px 8px;color:#6b7280">Create or delete topics</td></tr>
+              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">❓ Help</td><td style="padding:4px 8px;color:#6b7280">This guide</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">★ Credits</td><td style="padding:4px 8px;color:#6b7280">Developer info &amp; open source stack</td></tr>
+            </table>
+            Below the topic tabs: <strong>▶ Run Now</strong> and <strong>⚙️ Settings</strong> apply to the active topic.
           </div>
 
         </div>
@@ -1541,84 +1554,97 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="helpTabTopics" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
         <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">📂 Managing Topics</h2>
 
-        <p style="margin-bottom:14px">Each topic is a fully independent research stream with its own schedule, research queries, reports, and Discord webhook.</p>
+        <p style="margin-bottom:14px">Each topic is a fully independent research stream with its own schedule, queries, reports, style, and Discord webhook.</p>
 
         <div style="display:flex;flex-direction:column;gap:12px">
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Creating a topic</div>
-            Click <strong>⊕ Topic Mgmt</strong> → enter a display name → <strong>Create</strong>. ScoutForge creates the config and skills files automatically. The topic is immediately available — no restart needed.
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">✨ Creating a topic (AI auto-configure)</div>
+            Click <strong>⊕ Topic Mgmt</strong> → enter a topic <strong>name</strong> and a <strong>goal</strong> (2–3 lines describing what you want to monitor and why) → <strong>✨ Create &amp; Auto-Configure</strong>.<br><br>
+            The LLM uses your goal to generate:<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
+              <li>A <strong>Skills description</strong> (shown as the topic's about banner)</li>
+              <li><strong>3 research areas</strong> with 4 search queries each</li>
+            </ul>
+            Both are editable in Settings after creation. The topic tab appears immediately — no restart needed.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">⚠️ Amber dot indicator</div>
-            A topic tab shows an <span style="color:#f59e0b;font-weight:700">●</span> dot when its <strong>Skills</strong> description is empty. Go to ⚙️ Settings → Skills to fill it in and clear the indicator.
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Settings modal tabs</div>
+            Open <strong>⚙️ Settings</strong> (below the topic tabs) to access:<br>
+            <table style="width:100%;font-size:.8rem;border-collapse:collapse;margin-top:8px">
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🤖 Model</td><td style="padding:4px 8px;color:#6b7280">Ollama model for all synthesis (global)</td></tr>
+              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">📋 Skills</td><td style="padding:4px 8px;color:#6b7280">Topic description shown on the dashboard</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🔍 Research Queries</td><td style="padding:4px 8px;color:#6b7280">Areas and search queries — save inline</td></tr>
+              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">⚙ Topic Settings</td><td style="padding:4px 8px;color:#6b7280">Depth, style, age filter, dedup window, Discord</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">📅 Schedule</td><td style="padding:4px 8px;color:#6b7280">Frequency, time, day — saves immediately</td></tr>
+              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🛡️ Guardrails</td><td style="padding:4px 8px;color:#6b7280">Log of blocked articles (prompt injection)</td></tr>
+            </table>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">⚠️ Amber dot — empty skill indicator</div>
+            A topic tab shows a <span style="color:#f59e0b;font-weight:700">●</span> dot when its Skills description is empty. Go to ⚙️ Settings → 📋 Skills to fill it in.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Deleting a topic</div>
-            Open <strong>⊕ Topic Mgmt</strong> → click <strong>Delete</strong> next to the topic. This permanently removes the topic config <em>and all its reports</em>. Cannot be undone.
-          </div>
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Settings — Skills tab</div>
-            A plain-English description of what this topic monitors. The first paragraph is shown as the yellow info banner on the topic's dashboard page. Supports multiple paragraphs and bullet points.
+            <strong>⊕ Topic Mgmt</strong> → click <strong>Delete</strong> next to the topic. Permanently removes the config <em>and all its reports</em>. Cannot be undone.
           </div>
         </div>
       </div>
 
       <!-- Research -->
       <div id="helpTabResearch" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
-        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🔍 Research Queries &amp; Reports</h2>
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🔍 Research &amp; Reports</h2>
 
         <div style="display:flex;flex-direction:column;gap:12px">
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Research Areas &amp; Queries</div>
-            Go to <strong>⚙️ Settings → 🔍 Research Queries</strong>.<br>
-            Each <strong>area</strong> is a named domain (e.g. "AI Security Incidents"). Each area has a list of <strong>search queries</strong> — one per line — that ScoutForge sends to SearXNG.<br>
-            <span style="color:#6b7280;font-size:.82rem">Tip: 6–10 specific queries per area gives the best coverage. Avoid overly broad terms.</span>
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">▶ Run Now — Scheduled research</div>
+            Click <strong>▶ Run Now</strong> (below the topic tabs) to trigger an immediate full research run. The pipeline: searches all configured areas → extracts article content → deduplicates against the last N reports → synthesises a brief with the LLM → saves as Markdown → optionally notifies Discord.<br>
+            A live progress card appears while running. Typical duration: <strong>4–10 minutes</strong>.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Full Research Run</div>
-            Searches all configured areas, fetches article content, deduplicates against previous reports, and synthesises a structured intelligence brief. Progress is shown step by step. Typical duration: <strong>4–10 minutes</strong>.<br><br>
-            <strong>Report depth</strong> (⚙️ Settings → ⚙ Topic Settings → Scheduled Report Depth):<br>
-            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:2px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Report depth (⚙️ Settings → ⚙ Topic Settings)</div>
+            <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:2px">
               <li><strong>1-pager</strong> (default) — Executive summary + per-area findings. Fastest.</li>
-              <li><strong>2-pager</strong> — Adds Key Insights &amp; Takeaways section.</li>
+              <li><strong>2-pager</strong> — Adds Key Insights &amp; Takeaways.</li>
               <li><strong>3-pager</strong> — Full detail with Key Insights and a Watch List.</li>
             </ul>
-            <br>
-            <strong>Report style</strong> (⚙️ Settings → ⚙ Topic Settings → Report Style):<br>
-            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
-              <li><strong>Quick Summary</strong> (default) — Structured bullet-point intelligence brief with headings and sections.</li>
-              <li><strong>Q&amp;A</strong> — The LLM generates key questions and answers from the findings. Great for knowledge review.</li>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Report style (⚙️ Settings → ⚙ Topic Settings)</div>
+            All styles render as formatted HTML with style-specific layout.<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:4px">
+              <li><strong>Quick Summary</strong> (default) — Structured headings and bullet points. Classic intelligence brief format.</li>
+              <li><strong>Q&amp;A</strong> — The LLM generates question/answer pairs from the findings. Great for review and knowledge extraction.</li>
               <li><strong>Blog Post</strong> — Flowing narrative article with inline citations. Readable as a standalone piece.</li>
+              <li><strong>Story</strong> — Narrative storytelling format. The LLM transforms findings into vivid chapters with a prologue and epilogue — rendered in serif book typography.</li>
             </ul>
-            Each style renders as a formatted HTML report with style-specific layout.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">🔍 Adhoc Topic Search</div>
-            Click the <strong>🔍 Adhoc Search</strong> button in the top bar to open a search modal.<br>
-            Enter any topic, optional context, a depth (1–5 pages), and choose which topic to save the result under. The report is saved immediately and appears in the Intelligence Reports list.
+            Click <strong>🔍 Adhoc Search</strong> in the top bar. Enter any topic, optional context, a depth (1–5 pages), and which topic to save under. A live web search is run immediately and the report saved. Independent of your scheduled research areas.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">💬 Ask Reports — Chatbot</div>
-            The <strong>Ask Reports</strong> panel on the main page is a chatbot window. Select a scope from the dropdown:<br>
+            The <strong>Ask Reports</strong> panel on the left is a chatbot. Use the dropdown to choose scope:<br>
             <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
-              <li><strong>All Topics</strong> — searches the 3 most recent reports from every topic (up to 8 total)</li>
-              <li><strong>Specific topic</strong> — searches the last 5 reports from that topic only</li>
+              <li><strong>All Topics</strong> — last 3 reports from every topic (up to 8 total)</li>
+              <li><strong>Specific topic</strong> — last 5 reports from that topic</li>
+              <li><strong>❓ Help Docs</strong> — asks questions about ScoutForge itself (this guide)</li>
             </ul>
-            Type your question and hit <strong>Ask</strong> — responses appear in a conversation thread below. Example: <em>"What new CVEs were disclosed across all my topics this week?"</em>
+            Questions and answers appear as conversation bubbles. All questions are screened for prompt injection — adversarial inputs are blocked.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">💬 Per-Report Chat</div>
-            Click the 💬 icon next to any report to open a focused chat window scoped to that single report only. Great for drilling into a specific brief.
+            Click the 💬 icon next to any report to open a focused chat window scoped to that single report. Questions answered using only that report's content.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">📄 Report Viewer &amp; Print</div>
-            Click the 📄 icon on any report to open the full HTML viewer. The viewer applies style-specific formatting. Use the <strong>🖨 Print / Save PDF</strong> button to export the report as a PDF. A <strong>Raw Markdown</strong> link is also available for plain text access.
+            Click 📄 on any report for the full HTML viewer with style-specific formatting. Use <strong>🖨 Print / Save PDF</strong> to export, or <strong>Raw Markdown</strong> for plain text.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Report file naming</div>
-            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">research_brief_{topic}_{YYYYMMDD_HHMMSS}.md</code> — scheduled run<br>
-            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md</code> — adhoc search<br>
-            Reports are stored in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/{topic-id}/</code>
+            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">research_brief_{topic}_{YYYYMMDD_HHMMSS}.md</code> — scheduled<br>
+            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md</code> — adhoc<br>
+            Stored in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/{topic-id}/</code>
           </div>
         </div>
       </div>
