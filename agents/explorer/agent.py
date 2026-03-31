@@ -583,6 +583,17 @@ def run_research(expl_id: str | None = None) -> dict:
             "new_items": new_count, "duplicates_removed": skipped,
         }
         log.info(f"[{eid}] Research run complete.")
+
+        # Auto-notify Discord if configured
+        webhook = expl_cfg.get("discord_webhook", "").strip()
+        if webhook and expl_cfg.get("discord_auto_notify", False):
+            try:
+                content = _discord_summary(filepath, expl_cfg)
+                result  = _send_discord(webhook, content)
+                log.info(f"[{eid}] Discord auto-notify: {result}")
+            except Exception as e:
+                log.warning(f"[{eid}] Discord auto-notify failed: {e}")
+
         return _run_status[eid]
 
     except Exception as e:
@@ -879,6 +890,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div class="report-actions">
               <button class="btn-icon" title="View report" onclick="window.open('/reports/{{ active_expl_id }}/{{ r }}','_blank')">📄</button>
               <button class="btn-icon" title="Ask question about this report" onclick="openReportAsk('{{ r }}')">💬</button>
+              <button class="btn-icon" title="Send to Discord" onclick="sendToDiscord('{{ r }}', this)">🔔</button>
               <button class="btn-icon" title="Delete report" onclick="deleteReport('{{ r }}')">🗑</button>
             </div>
           </li>
@@ -986,6 +998,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Dedup Against Last N Reports</label>
             <input type="number" id="topicDedup" min="0" max="10" style="width:100px">
             <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">How many previous reports to check for duplicate findings.</div>
+          </div>
+          <hr style="border:none;border-top:1px solid #e5e7eb">
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:#374151;margin-bottom:10px">🔔 Discord Notifications</div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Webhook URL</label>
+                <input type="text" id="discordWebhook" placeholder="https://discord.com/api/webhooks/…" style="font-family:monospace;font-size:.78rem">
+                <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">
+                  Discord channel webhook. In Discord: channel settings → Integrations → Webhooks → New Webhook → Copy URL.
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" id="discordAutoNotify" style="width:auto;margin:0">
+                <label for="discordAutoNotify" style="font-size:.78rem;color:#374151;cursor:pointer">Auto-notify on every scheduled run</label>
+              </div>
+              <div>
+                <button class="btn btn-secondary btn-sm" onclick="testDiscordWebhook()">🔔 Test Webhook</button>
+                <span id="discordTestMsg" style="font-size:.78rem;margin-left:8px"></span>
+              </div>
+            </div>
           </div>
         </div>
         <div id="topicSettingsMsg" style="font-size:.78rem;min-height:1.2em;margin-top:14px"></div>
@@ -1372,6 +1405,29 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     document.getElementById('reportAskInput').focus();
   }
 
+  // ── Discord ───────────────────────────────────────────────────────
+  async function sendToDiscord(filename, btn){
+    const orig=btn.textContent;
+    btn.textContent='⟳'; btn.disabled=true;
+    try{
+      const r=await fetch('/api/reports/'+EXPL_ID+'/'+encodeURIComponent(filename)+'/discord',{method:'POST'});
+      const d=await r.json();
+      if(d.error){ alert('Discord send failed: '+d.error); }
+      else{ btn.textContent='✔'; setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},2000); return; }
+    }catch(e){ alert('Discord send failed: '+e.message); }
+    btn.textContent=orig; btn.disabled=false;
+  }
+
+  async function testDiscordWebhook(){
+    const url=document.getElementById('discordWebhook').value.trim();
+    const msg=document.getElementById('discordTestMsg');
+    if(!url){msg.textContent='⚠ Enter a webhook URL first';msg.style.color='#dc2626';return;}
+    msg.textContent='Sending…';msg.style.color='#6b7280';
+    const d=await(await fetch('/api/discord/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:url,expl_id:EXPL_ID})})).json();
+    if(d.status==='sent'){msg.textContent='✔ Test message sent!';msg.style.color='#16a34a';}
+    else{msg.textContent='⚠ '+(d.error||'Unknown');msg.style.color='#dc2626';}
+  }
+
   // ── Delete Report ─────────────────────────────────────────────────
   async function deleteReport(name){
     if(!confirm('Delete report: '+name+'?'))return;
@@ -1490,17 +1546,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     document.getElementById('topicTimeRange').value=r.time_range||'';
     document.getElementById('topicMaxAge').value=r.max_age_months||3;
     document.getElementById('topicDedup').value=r.dedup_against_last_n_reports||2;
+    document.getElementById('discordWebhook').value=d.discord_webhook||'';
+    document.getElementById('discordAutoNotify').checked=!!d.discord_auto_notify;
     document.getElementById('topicSettingsMsg').textContent='';
+    document.getElementById('discordTestMsg').textContent='';
   }
 
   async function saveTopicSettings(){
     const msg=document.getElementById('topicSettingsMsg');
     msg.textContent='Saving…';msg.style.color='#6b7280';
-    const body={research:{
-      time_range:document.getElementById('topicTimeRange').value.trim(),
-      max_age_months:parseInt(document.getElementById('topicMaxAge').value)||3,
-      dedup_against_last_n_reports:parseInt(document.getElementById('topicDedup').value)||2,
-    }};
+    const body={
+      research:{
+        time_range:document.getElementById('topicTimeRange').value.trim(),
+        max_age_months:parseInt(document.getElementById('topicMaxAge').value)||3,
+        dedup_against_last_n_reports:parseInt(document.getElementById('topicDedup').value)||2,
+      },
+      discord_webhook:document.getElementById('discordWebhook').value.trim(),
+      discord_auto_notify:document.getElementById('discordAutoNotify').checked,
+    };
     const d=await(await fetch('/api/topics/'+EXPL_ID+'/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
     if(d.status==='saved'){msg.textContent='✔ Settings saved!';msg.style.color='#16a34a';}
     else{msg.textContent='⚠ '+(d.error||'Unknown');msg.style.color='#dc2626';}
@@ -2138,7 +2201,8 @@ def api_topics_create():
         if new_cfg:
             s = new_cfg.get("schedule", {})
             _scheduler.add_job(run_research, _build_cron_trigger(s), args=[slug],
-                               id=f"research_{slug}", replace_existing=True)
+                               id=f"research_{slug}", replace_existing=True,
+                               misfire_grace_time=86400, coalesce=True)
     log.info(f"Topic created: {slug} ({name})")
     return jsonify({"status": "created", "id": slug, "title": name})
 
@@ -2152,11 +2216,13 @@ def api_topic_config_get(topic_id: str):
     return jsonify({
         "id":    topic_id,
         "title": expl_cfg.get("title", topic_id),
+        "discord_webhook":     expl_cfg.get("discord_webhook", ""),
+        "discord_auto_notify": expl_cfg.get("discord_auto_notify", False),
         "research": {
-            "time_range":                  research.get("time_range", ""),
-            "max_age_months":              research.get("max_age_months", 3),
+            "time_range":                   research.get("time_range", ""),
+            "max_age_months":               research.get("max_age_months", 3),
             "dedup_against_last_n_reports": research.get("dedup_against_last_n_reports", 2),
-            "topics":                      research.get("topics", []),
+            "topics":                       research.get("topics", []),
         },
     })
 
@@ -2183,6 +2249,10 @@ def api_topic_config_save(topic_id: str):
             raw["research"]["dedup_against_last_n_reports"] = int(r["dedup_against_last_n_reports"])
         if "topics" in r:
             raw["research"]["topics"] = r["topics"]
+        if "discord_webhook" in body:
+            raw["discord_webhook"] = body["discord_webhook"]
+        if "discord_auto_notify" in body:
+            raw["discord_auto_notify"] = bool(body["discord_auto_notify"])
         with open(cfg_path, "w") as f:
             yaml.dump(raw, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         _reload_explorations()
@@ -2211,6 +2281,64 @@ def api_topics_delete(topic_id: str):
     _reload_explorations()
     log.info(f"Topic deleted: {topic_id}")
     return jsonify({"status": "deleted", "id": topic_id})
+
+
+def _send_discord(webhook_url: str, content: str) -> dict:
+    """POST a message to a Discord webhook. Splits into ≤2000-char chunks."""
+    if not webhook_url:
+        return {"error": "No webhook URL configured"}
+    chunks = [content[i:i+1990] for i in range(0, len(content), 1990)]
+    for chunk in chunks:
+        try:
+            r = requests.post(webhook_url, json={"content": chunk}, timeout=10)
+            if r.status_code not in (200, 204):
+                return {"error": f"Discord returned HTTP {r.status_code}: {r.text[:200]}"}
+        except Exception as e:
+            return {"error": str(e)}
+    return {"status": "sent", "chunks": len(chunks)}
+
+
+def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
+    """Build a Discord-friendly summary from a report file."""
+    title  = expl_cfg.get("title", expl_cfg.get("id", "ScoutForge"))
+    text   = report_path.read_text()
+    lines  = text.splitlines()
+    # Extract executive summary / What's New section (first 30 lines after the header)
+    body_lines = [l for l in lines if not l.startswith("**") or "Date" not in l]
+    summary = "\n".join(body_lines[:60]).strip()
+    header  = f"**📡 ScoutForge — {title}**\n**Report:** `{report_path.name}`\n\n"
+    return header + summary[:1800]
+
+
+@app.route("/api/reports/<expl_id>/<filename>/discord", methods=["POST"])
+def api_report_send_discord(expl_id: str, filename: str):
+    filepath = _reports_dir(expl_id) / filename
+    if not filepath.exists() or filepath.suffix != ".md":
+        return jsonify({"error": "Report not found"}), 404
+    expl_cfg = EXPLORATIONS.get(expl_id) or _get_expl(expl_id)
+    if not expl_cfg:
+        return jsonify({"error": "Topic not found"}), 404
+    webhook_url = expl_cfg.get("discord_webhook", "").strip()
+    if not webhook_url:
+        return jsonify({"error": "No Discord webhook configured for this topic. Go to ⚙️ Settings → Topic Settings to add one."}), 400
+    content = _discord_summary(filepath, expl_cfg)
+    result  = _send_discord(webhook_url, content)
+    log.info(f"Discord send [{expl_id}/{filename}]: {result}")
+    return jsonify(result)
+
+
+@app.route("/api/discord/test", methods=["POST"])
+def api_discord_test():
+    body        = request.json or {}
+    webhook_url = body.get("webhook_url", "").strip()
+    expl_id     = body.get("expl_id", "")
+    expl_cfg    = EXPLORATIONS.get(expl_id) or {}
+    title       = expl_cfg.get("title", expl_id or "ScoutForge")
+    if not webhook_url:
+        return jsonify({"error": "Provide a webhook_url"}), 400
+    msg = f"**📡 ScoutForge — {title}**\n✅ Webhook test successful! Notifications from this topic will appear here."
+    result = _send_discord(webhook_url, msg)
+    return jsonify(result)
 
 
 @app.route("/health")
@@ -2274,6 +2402,8 @@ def start_scheduler():
             args=[eid],
             id=f"research_{eid}",
             replace_existing=True,
+            misfire_grace_time=86400,   # fire even if missed by up to 24h (e.g. after container restart)
+            coalesce=True,              # only fire once if multiple runs were missed
         )
         log.info(f"Scheduled [{eid}]: {_describe_schedule(s)}")
     _scheduler.start()
