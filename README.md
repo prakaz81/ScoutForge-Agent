@@ -99,8 +99,8 @@ Browser → http://localhost:8888
 
 | Requirement | Details |
 |---|---|
-| **Docker Desktop** | macOS — [download here](https://www.docker.com/products/docker-desktop/) |
-| **Ollama** | Installed on the Mac host — [download here](https://ollama.com/) |
+| **Docker Desktop** | Mac or Windows — [download here](https://www.docker.com/products/docker-desktop/) |
+| **Ollama** | Installed on the host machine (not in Docker) — [download here](https://ollama.com/) |
 | **llama3.1:8b** | The default model — pull with `ollama pull llama3.1:8b` |
 | **RAM** | 8 GB minimum recommended (16 GB for comfortable headroom) |
 | **Disk** | ~1 GB for containers + model; reports are small Markdown files |
@@ -114,8 +114,8 @@ Browser → http://localhost:8888
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/prakaz81/ScoutForge.git
-cd ScoutForge
+git clone https://github.com/prakaz81/ScoutForge-Agent.git
+cd ScoutForge-Agent
 ```
 
 ### 2. Pull the Ollama model
@@ -126,25 +126,44 @@ ollama pull llama3.1:8b
 
 ### 3. First-time setup
 
+**Mac / Linux**
 ```bash
 ./run.sh setup
 ```
 
-This generates a SearXNG secret key and builds + starts all containers.
+**Windows (PowerShell)**
+```powershell
+.\run.ps1 setup
+```
+
+This generates a SearXNG secret key and builds + starts all containers. Everything runs in Docker — no manual dependency installation needed.
 
 ### 4. Open the dashboard
 
+**Mac / Linux**
 ```bash
 ./run.sh open
-# → http://localhost:8888
 ```
+
+**Windows**
+```powershell
+.\run.ps1 open
+```
+
+→ `http://localhost:8888`
 
 ### 5. Run your first research brief
 
-Click **▶ Run Full Research Now** on any topic, or:
+Click **▶ Run Now** below any topic tab, or trigger from the terminal:
 
+**Mac / Linux**
 ```bash
 ./run.sh research
+```
+
+**Windows**
+```powershell
+.\run.ps1 research
 ```
 
 ---
@@ -308,6 +327,7 @@ research:
 
 ## Control Script
 
+**Mac / Linux (`run.sh`)**
 ```bash
 ./run.sh setup        # First-time: generate SearXNG key, build, start
 ./run.sh start        # Start all services
@@ -316,7 +336,21 @@ research:
 ./run.sh rebuild      # Rebuild after code changes
 ./run.sh logs         # Stream container logs
 ./run.sh open         # Open dashboard in browser
+./run.sh research     # Trigger a research run now
 ./run.sh help         # Show all commands
+```
+
+**Windows (`run.ps1`)**
+```powershell
+.\run.ps1 setup       # First-time: generate SearXNG key, build, start
+.\run.ps1 start       # Start all services
+.\run.ps1 stop        # Stop all services
+.\run.ps1 restart     # Restart without rebuilding
+.\run.ps1 rebuild     # Rebuild after code changes
+.\run.ps1 logs        # Stream container logs
+.\run.ps1 open        # Open dashboard in browser
+.\run.ps1 research    # Trigger a research run now
+.\run.ps1 help        # Show all commands
 ```
 
 ---
