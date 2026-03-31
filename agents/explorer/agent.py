@@ -1035,7 +1035,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openAdhocSearchModal()">🔍 Adhoc Search</button>
       <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
       <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openModal('helpModal')">❓ Help</button>
-      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openModal('creditsModal')">★ Credits</button>
     </div>
   </div>
 
@@ -1175,9 +1174,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   <!-- Page footer -->
   <div style="margin-top:24px;padding:12px 0;border-top:1px solid #e5e7eb;text-align:center;font-size:.7rem;color:#d1d5db">
-    ScoutForge &nbsp;·&nbsp;
-    <button onclick="openModal('creditsModal')" style="background:none;border:none;color:#d1d5db;font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline dotted">Developed by Prakash Narayanamoorthy</button>
-    &nbsp;·&nbsp; Local AI · No cloud · No subscriptions
+    ScoutForge &nbsp;·&nbsp; Local AI · No cloud · No subscriptions &nbsp;·&nbsp;
+    <button onclick="openModal('creditsModal')" style="background:none;border:none;color:#d1d5db;font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline dotted">★ Credits</button>
   </div>
 
 </div><!-- /shell -->
@@ -1552,7 +1550,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🔍 Adhoc Search</td><td style="padding:4px 8px;color:#6b7280">One-off live research on any topic</td></tr>
               <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">⊕ Topic Mgmt</td><td style="padding:4px 8px;color:#6b7280">Create or delete topics</td></tr>
               <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">❓ Help</td><td style="padding:4px 8px;color:#6b7280">This guide</td></tr>
-              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">★ Credits</td><td style="padding:4px 8px;color:#6b7280">Developer info &amp; open source stack</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">★ Credits</td><td style="padding:4px 8px;color:#6b7280">Developer info &amp; open source stack (link at page footer)</td></tr>
             </table>
             Below the topic tabs: <strong>▶ Run Now</strong> and <strong>⚙️ Settings</strong> apply to the active topic.
           </div>
