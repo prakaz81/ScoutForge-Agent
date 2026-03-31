@@ -35,12 +35,13 @@ You can also trigger ad-hoc research on any topic, ask questions across all past
 ## Features
 
 - **Multiple independent topics** — create and manage as many research topics as you need from the dashboard
+- **📌 AI News default topic** — ships pre-configured with broad AI field coverage (models, industry, policy, developer tools); protected from deletion
 - **✨ AI-powered topic creation** — describe your goal in 2–3 lines; ScoutForge auto-generates the Skills description and 3 research areas with 4 queries each using the LLM
 - **Full topic management UI** — create, configure, and delete topics without touching config files
 - **Research Queries editor** — add, edit, and remove research areas and their search queries from the browser
 - **Intelligent deduplication** — Ollama compares new findings against previous reports so every brief contains only genuinely new information
 - **Local-first** — Ollama (LLM) and SearXNG (search) run locally; no cloud AI or third-party search APIs needed
-- **Scheduled runs** — Daily, weekly, or monthly; configurable per topic from Settings → Schedule tab; takes effect immediately without restarting
+- **Scheduled runs** — Every 1/2/3/4/6/8 hours, daily, weekly, or monthly; configurable per topic from Settings → Schedule tab; takes effect immediately without restarting
 - **🔍 Adhoc Topic Search** — Live web search on any topic via a modal; choose depth and target topic; result saved as a report instantly
 - **💬 Ask Reports chatbot** — Chat-style Q&A window with topic selector (All Topics / specific topic / Help Docs); RAG across recent reports
 - **❓ Help Docs chatbot mode** — ask questions about ScoutForge itself; the chatbot answers from the built-in user guide
@@ -162,14 +163,13 @@ The **top bar** shows the ScoutForge brand and tagline on the left and action bu
 | **🔍 Adhoc Search** | Opens the Adhoc Topic Search modal |
 | **⊕ Topic Mgmt** | Create, manage, or delete topics |
 | **❓ Help** | In-app setup and usage guide |
-| **★ Credits** | Developer info + open source stack |
-
 Below the top bar, **topic tabs** let you switch between topics. Directly below the tabs, a context bar shows the topic name and schedule on the left, and **▶ Run Now** and **⚙️ Settings** buttons on the right.
 
 ### Topic Management
 
+- **AI News (default)** — Ships pre-configured; marked with 📌 Default badge; cannot be deleted.
 - **Create** — Enter a topic name and describe your goal (2–3 lines, required). Click **✨ Create & Auto-Configure**. ScoutForge uses the LLM to generate a Skills description and 3 research areas with 4 queries each, then creates the topic immediately. The new tab appears without a restart.
-- **Delete** — Removes the topic, its config, and all its reports.
+- **Delete** — Removes the topic, its config, and all its reports. Protected topics show a 🔒 icon instead of a Delete button.
 - **Configure** — After creation, open the topic and use ⚙️ Settings to review or adjust the auto-generated queries, skill description, schedule, and report style.
 
 ### Settings Modal (per topic)
@@ -180,7 +180,7 @@ Below the top bar, **topic tabs** let you switch between topics. Directly below 
 | **📋 Skills** | Plain-English description of what the topic monitors (shown on dashboard) |
 | **🔍 Research Queries** | Research areas and their search queries — add/edit/remove without restarting |
 | **⚙ Topic Settings** | Report depth, report style, time range filter, max article age, dedup window, Discord webhook |
-| **📅 Schedule** | Frequency (daily/weekly/monthly), time, day — takes effect immediately |
+| **📅 Schedule** | Frequency (hourly/daily/weekly/monthly), time, day — takes effect immediately |
 | **🛡️ Guardrails** | Log of articles blocked by the prompt injection defence |
 
 ### Empty Skill Indicator
@@ -194,7 +194,7 @@ Topics without a skill description show an amber **●** dot in the nav tab and 
 | **Last Run** | Status badge, timestamp, report name, stats (gathered / unique / deduped) |
 | **Research Running** | Progress card — appears automatically while a run is in progress with step-by-step status |
 | **💬 Ask Reports** | Chatbot window — select All Topics, a specific topic, or Help Docs; ask any question; answers drawn from past reports or the built-in guide |
-| **Intelligence Reports** | All saved reports with style badges, view button, per-report chat, Discord send, delete |
+| **Generated Reports** | All saved reports with style badges, view button, per-report chat, Discord send, delete |
 
 ### Adhoc Topic Search
 

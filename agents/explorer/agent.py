@@ -269,8 +269,9 @@ TOPIC TABS AND ACTIONS
 - Settings (per-topic): opens Settings modal
 
 TOPIC MANAGEMENT (Topic Mgmt button)
+- AI News: ships pre-configured as the default topic (broad AI field coverage). Marked 📌 Default with a 🔒 lock — cannot be deleted.
 - Create: enter a topic name and description/goal; ScoutForge auto-generates skills and research queries using the LLM. The new tab appears without restart.
-- Delete: permanently removes the topic, config, and all its reports.
+- Delete: permanently removes the topic, config, and all its reports. Protected topics show a lock icon instead of Delete.
 - Empty skill indicator: amber dot on tab when Skills description is empty.
 
 SETTINGS MODAL (per-topic)
@@ -285,7 +286,7 @@ Tabs:
 SCHEDULED RESEARCH RUNS
 Each topic runs on its own schedule. The pipeline: searches all configured areas → extracts article content → deduplicates against previous N reports → synthesises a structured brief with the LLM → saves as Markdown → optionally notifies Discord.
 Missed runs: 24-hour misfire window — if the container restarts after the scheduled time, the run fires immediately on startup.
-Schedule is in Settings → Schedule tab. Changes take effect immediately.
+Schedule is in Settings → Schedule tab. Frequencies available: Every 1/2/3/4/6/8 hours, Daily, Weekly, Monthly. Changes take effect immediately. For hourly schedules the time-of-day field is hidden (runs on the interval).
 
 REPORT DEPTH (Settings → Topic Settings)
 - 1-pager (default): Executive summary + per-area findings. Fastest.
@@ -1716,8 +1717,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             A topic tab shows a <span style="color:#f59e0b;font-weight:700">●</span> dot when its Skills description is empty. Go to ⚙️ Settings → 📋 Skills to fill it in.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">📌 AI News — default topic</div>
+            ScoutForge ships with <strong>AI News</strong> pre-configured: broad AI field coverage across models &amp; research, industry &amp; startups, policy &amp; regulation, and developer tools. It is marked <span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:10px;padding:1px 7px;font-size:.75rem;font-weight:600">📌 Default</span> in Topic Mgmt and shows a 🔒 lock instead of a Delete button — it cannot be deleted.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Deleting a topic</div>
-            <strong>⊕ Topic Mgmt</strong> → click <strong>Delete</strong> next to the topic. Permanently removes the config <em>and all its reports</em>. Cannot be undone.
+            <strong>⊕ Topic Mgmt</strong> → click <strong>Delete</strong> next to the topic. Permanently removes the config <em>and all its reports</em>. Cannot be undone. Protected topics (AI News) show a 🔒 lock instead of Delete.
           </div>
         </div>
       </div>
@@ -1831,11 +1836,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Setting the schedule</div>
             Open <strong>⚙️ Settings → 📅 Schedule</strong>. Configure:<br>
             <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
-              <li><strong>Frequency</strong> — Daily, Weekly, or Monthly</li>
-              <li><strong>Time</strong> — hour and minute (24h format)</li>
+              <li><strong>Frequency</strong> — Every 1 / 2 / 3 / 4 / 6 / 8 hours, Daily, Weekly, or Monthly</li>
+              <li><strong>Time</strong> — hour and minute (24h); hidden for hourly options (runs on the interval)</li>
               <li><strong>Day of week</strong> (weekly) or <strong>Day of month</strong> (monthly)</li>
             </ul>
-            Click <strong>💾 Save Schedule</strong> — takes effect immediately, no restart needed. The current schedule and next run time are shown at the top of the tab.
+            Click <strong>💾 Save Schedule</strong> — takes effect immediately, no restart needed. The current schedule and next run time are shown below the topic tabs.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Missed runs &amp; container restarts</div>
