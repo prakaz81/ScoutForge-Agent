@@ -11,6 +11,7 @@ Reports:        /reports/{id}/                           (per-exploration report
 
 import os
 import re
+import json
 import shutil
 import logging
 import requests
@@ -1179,6 +1180,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   </div><!-- /grid2 -->
 
+  <!-- ── Adhoc Reports Section ─────────────────────────────────────── -->
+  <div class="card" style="margin-top:18px">
+    <div class="section-label" style="margin-bottom:12px">
+      <span>🔍 Adhoc Reports</span>
+      <span style="font-size:.65rem;color:#475569;font-weight:400;text-transform:none">one-off research · newest first · <button onclick="openAdhocSearchModal()" style="background:none;border:none;color:#2563eb;cursor:pointer;padding:0;font-size:.65rem;font-weight:600;text-decoration:underline dotted">+ New Adhoc Search</button></span>
+    </div>
+    <ul class="report-list" id="adhocReportList">
+      <li class="no-reports">No adhoc reports yet — click <strong>🔍 Adhoc Search</strong> to generate one.</li>
+    </ul>
+  </div>
+
   <!-- Page footer -->
   <div style="margin-top:24px;padding:12px 0;border-top:1px solid #e5e7eb;text-align:center;font-size:.7rem;color:#6b7280">
     <button onclick="openModal('creditsModal')" style="background:none;border:none;color:#374151;font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline dotted;font-weight:600">★ Credits</button>
@@ -1422,6 +1434,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       </div>
       <div id="footQueries" style="display:none;gap:8px">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+        <button class="btn btn-secondary" id="autoGenQueriesBtn" onclick="autoGenerateQueries()">✨ Auto Generate</button>
         <button class="btn btn-primary" onclick="saveQueries()">💾 Save Queries</button>
       </div>
       <div id="footTopic" style="display:none;gap:8px">
@@ -1984,11 +1997,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </select>
           </div>
           <div style="flex:1;min-width:160px">
-            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Save under Topic</label>
-            <select id="adhocExplSelect">
-              {% for expl in explorations %}
-              <option value="{{ expl.id }}" {% if expl.id == active_expl_id %}selected{% endif %}>{{ expl.title }}</option>
-              {% endfor %}
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Report Style</label>
+            <select id="adhocStyleSelect">
+              <option value="summary">Quick Summary (default)</option>
+              <option value="qa">Q&amp;A</option>
+              <option value="blog">Blog Post</option>
+              <option value="story">Story</option>
             </select>
           </div>
         </div>
@@ -2132,6 +2146,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   function openAdhocSearchModal(){
     document.getElementById('adhocTopicInput').value='';
     document.getElementById('adhocContextInput').value='';
+    document.getElementById('adhocDepthSelect').value='1';
+    document.getElementById('adhocStyleSelect').value='summary';
     document.getElementById('adhocOutput').style.display='none';
     document.getElementById('adhocResult').style.display='none';
     openModal('adhocSearchModal');
@@ -2143,7 +2159,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const context=document.getElementById('adhocContextInput').value.trim();
     if(!topic){document.getElementById('adhocTopicInput').focus();return;}
     const depth=parseInt(document.getElementById('adhocDepthSelect').value)||1;
-    const expl_id=document.getElementById('adhocExplSelect').value||EXPL_ID;
+    const style=document.getElementById('adhocStyleSelect').value||'summary';
     const btn=document.getElementById('adhocBtn');
     const out=document.getElementById('adhocOutput');
     const prog=document.getElementById('adhocProgress');
@@ -2155,7 +2171,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     document.getElementById('adhocStatus').className='info';
     document.getElementById('adhocStatus').textContent='Searching the web for: "'+topic+'"…';
     try {
-      const r=await fetch('/api/research/topic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,context,depth,expl_id})});
+      const r=await fetch('/api/research/topic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,context,depth,style})});
       const d=await r.json();
       if(d.error||d.status==='timeout'){
         document.getElementById('adhocStatus').className='err';
@@ -2164,8 +2180,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         prog.style.display='none';
         res.style.display='block';
         document.getElementById('adhocReportName').textContent=d.report||'report saved';
-        document.getElementById('adhocReportLink').href='/reports/'+expl_id+'/'+encodeURIComponent(d.report||'');
-        setTimeout(()=>location.reload(),3000);
+        document.getElementById('adhocReportLink').href='/reports/__adhoc__/'+encodeURIComponent(d.report||'');
+        loadAdhocReports();
       }
     } catch(e){
       document.getElementById('adhocStatus').className='err';
@@ -2485,7 +2501,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <button class="btn btn-danger btn-sm" onclick="removeQueryArea(${i})">✕ Remove</button>
         </div>
         <label style="font-size:.72rem;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">Search Queries (one per line)</label>
-        <textarea rows="6" style="font-family:monospace;font-size:.78rem" placeholder="Enter search queries, one per line…"
+        <textarea rows="6" data-qi="${i}" style="font-family:monospace;font-size:.78rem" placeholder="Enter search queries, one per line…"
           oninput="_queriesData[${i}].queries=this.value.split('\\n').map(q=>q.trim()).filter(Boolean)"
         >${escHtml((area.queries||[]).join('\\n'))}</textarea>
       </div>`).join('');
@@ -2504,7 +2520,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     renderQueryAreas();
   }
 
+  function _flushQueriesFromDOM(){
+    // Read current DOM values into _queriesData in case oninput didn't fire
+    const container=document.getElementById('queriesContainer');
+    if(!container) return;
+    container.querySelectorAll('input[data-qi]').forEach(inp=>{
+      const i=parseInt(inp.dataset.qi);
+      if(_queriesData[i]!==undefined) _queriesData[i].area=inp.value;
+    });
+    container.querySelectorAll('textarea[data-qi]').forEach(ta=>{
+      const i=parseInt(ta.dataset.qi);
+      if(_queriesData[i]!==undefined) _queriesData[i].queries=ta.value.split('\n').map(q=>q.trim()).filter(Boolean);
+    });
+  }
+
   async function saveQueries(){
+    _flushQueriesFromDOM();
     const msg=document.getElementById('queriesMsg');
     msg.textContent='Saving…';msg.style.color='#6b7280';
     const d=await(await fetch('/api/topics/'+EXPL_ID+'/config',{
@@ -2513,6 +2544,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     })).json();
     if(d.status==='saved'){msg.textContent='✔ Queries saved!';msg.style.color='#16a34a';}
     else{msg.textContent='⚠ '+(d.error||'Unknown');msg.style.color='#dc2626';}
+  }
+
+  async function autoGenerateQueries(){
+    const btn=document.getElementById('autoGenQueriesBtn');
+    const msg=document.getElementById('queriesMsg');
+    btn.disabled=true; btn.textContent='⟳ Generating…';
+    msg.textContent='Generating research queries from your topic goal…'; msg.style.color='#6b7280';
+    try{
+      const r=await fetch('/api/topics/'+EXPL_ID+'/queries/autogenerate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+      const d=await r.json();
+      if(d.error){msg.textContent='⚠ '+d.error;msg.style.color='#dc2626';}
+      else{
+        _queriesData=d.topics;
+        renderQueryAreas();
+        msg.textContent='✨ Generated from your goal — review and save.';msg.style.color='#7c3aed';
+      }
+    }catch(e){
+      msg.textContent='⚠ '+e.message;msg.style.color='#dc2626';
+    }
+    btn.disabled=false; btn.textContent='✨ Auto Generate';
   }
 
   // ── Topic Settings Tab ─────────────────────────────────────────────
@@ -2612,6 +2663,36 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       alert('Delete failed: '+(d.error||'Unknown'));
     }
   }
+
+  // ── Adhoc Reports ─────────────────────────────────────────────────
+  async function loadAdhocReports(){
+    const list=document.getElementById('adhocReportList');
+    if(!list) return;
+    const d=await(await fetch('/api/reports/adhoc')).json();
+    if(!d.reports||d.reports.length===0){
+      list.innerHTML='<li class="no-reports">No adhoc reports yet — click <strong>🔍 Adhoc Search</strong> to generate one.</li>';
+      return;
+    }
+    list.innerHTML=d.reports.map(r=>`
+      <li class="report-item">
+        <span class="report-type" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;white-space:nowrap">Adhoc</span>
+        <span class="report-name" title="${escHtml(r)}">${escHtml(r)}</span>
+        <div class="report-actions">
+          <button class="btn-icon" title="View report" onclick="window.open('/reports/__adhoc__/'+encodeURIComponent('${escHtml(r)}'),'_blank')">📄</button>
+          <button class="btn-icon" title="Delete report" onclick="deleteAdhocReport('${escHtml(r)}')">🗑</button>
+        </div>
+      </li>`).join('');
+  }
+
+  async function deleteAdhocReport(name){
+    if(!confirm('Delete this adhoc report?')) return;
+    const d=await(await fetch('/api/reports/__adhoc__/'+encodeURIComponent(name),{method:'DELETE'})).json();
+    if(d.status==='deleted') loadAdhocReports();
+    else alert(d.error||'Delete failed');
+  }
+
+  // Initial load of adhoc reports
+  loadAdhocReports();
 
   // Auto-refresh every 30s while idle
   function safeReload(){
@@ -2836,6 +2917,13 @@ def api_reports():
     return jsonify({"count": len(reports), "reports": reports, "expl_id": expl_id})
 
 
+@app.route("/api/reports/adhoc")
+def api_reports_adhoc():
+    adhoc_dir = REPORTS_BASE_DIR / "__adhoc__"
+    reports   = sorted([p.name for p in adhoc_dir.glob("*.md")], reverse=True) if adhoc_dir.exists() else []
+    return jsonify({"count": len(reports), "reports": reports})
+
+
 @app.route("/reports/<expl_id>/<filename>/raw")
 def view_report_raw(expl_id: str, filename: str):
     filepath = _reports_dir(expl_id) / filename
@@ -3055,39 +3143,79 @@ def api_skill_autogenerate():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/topics/<topic_id>/queries/autogenerate", methods=["POST"])
+def api_queries_autogenerate(topic_id: str):
+    expl_cfg = EXPLORATIONS.get(topic_id)
+    if not expl_cfg:
+        return jsonify({"error": "Topic not found"}), 404
+    cfg_path = expl_cfg.get("_cfg_path")
+    if not cfg_path or not Path(cfg_path).exists():
+        return jsonify({"error": "Config not found"}), 404
+    with open(cfg_path) as f:
+        raw = yaml.safe_load(f)
+    name = raw.get("title", topic_id)
+    goal = (raw.get("description") or "").strip()
+    if not goal:
+        return jsonify({"error": "No goal set for this topic. Delete and recreate the topic with a detailed goal description to enable auto-generation."}), 400
+    try:
+        prompt = (
+            f"You are setting up a web research monitoring agent for the topic: \"{name}\".\n\n"
+            f"The user's research goal: {goal}\n\n"
+            f"Generate 3–5 research areas, each with 4 specific web search queries.\n\n"
+            f"Return ONLY a valid JSON array in this exact format (no markdown, no explanation):\n"
+            f'[\n  {{"area": "Area Name", "queries": ["query 1", "query 2", "query 3", "query 4"]}},\n'
+            f'  {{"area": "Another Area", "queries": ["query 1", "query 2", "query 3", "query 4"]}}\n]'
+        )
+        raw_text = call_ollama(prompt, system="You are a research query generator. Return only valid JSON, nothing else.")
+        # Extract JSON array from response
+        match = re.search(r'\[\s*\{.*?\}\s*\]', raw_text, re.DOTALL)
+        if not match:
+            return jsonify({"error": "Could not parse LLM response as JSON. Try again."}), 500
+        topics = json.loads(match.group(0))
+        if not isinstance(topics, list):
+            return jsonify({"error": "LLM returned unexpected format. Try again."}), 500
+        return jsonify({"topics": topics, "goal": goal})
+    except Exception as e:
+        log.error(f"Queries autogenerate failed for {topic_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/research/topic", methods=["POST"])
 def api_topic_research():
     body    = request.json or {}
     topic   = body.get("topic", "").strip()
     context = body.get("context", "").strip()
-    expl_id = body.get("expl_id") or DEFAULT_EXPL_ID
+    depth   = max(1, min(5, int(body.get("depth", 1) or 1)))
+    style   = body.get("style", "summary")
+    if style not in ("summary", "qa", "blog", "story"):
+        style = "summary"
     if not topic:
         return jsonify({"error": "Provide a topic in the request body: {\"topic\": \"...\"}"}), 400
     result = {}
-    def run(): nonlocal result; result.update(research_topic(topic, context, expl_id))
-    t = Thread(target=run, daemon=True); t.start(); t.join(timeout=360)
+    def run(): nonlocal result; result.update(research_topic(topic, context, depth, style))
+    t = Thread(target=run, daemon=True); t.start(); t.join(timeout=480)
     if result:
         return jsonify(result)
-    return jsonify({"status": "timeout", "error": "Research timed out after 6 minutes"}), 504
+    return jsonify({"status": "timeout", "error": "Research timed out after 8 minutes"}), 504
 
 
-def research_topic(topic: str, user_context: str = "", expl_id: str | None = None) -> dict:
+def research_topic(topic: str, user_context: str = "", depth: int = 1, style: str = "summary") -> dict:
     """Ad-hoc targeted research on any user-defined topic."""
-    expl_cfg    = _get_expl(expl_id)
-    reports_dir = _reports_dir(expl_cfg["id"]) if expl_cfg else REPORTS_BASE_DIR
-    max_age     = expl_cfg.get("research", {}).get("max_age_months", 3) if expl_cfg else 3
-    run_time    = datetime.now()
-    log.info(f"Ad-hoc topic research: {topic}")
+    run_time = datetime.now()
+    log.info(f"Ad-hoc topic research: {topic!r} depth={depth} style={style}")
+
+    # Scale number of search queries with depth
+    num_queries = {1: 4, 2: 6, 3: 8, 4: 10, 5: 12}[depth]
 
     query_prompt = (
-        f"Generate 6 specific web search queries to thoroughly research this topic:\n"
+        f"Generate {num_queries} specific web search queries to thoroughly research this topic:\n"
         f"TOPIC: {topic}\n"
         f"{'ADDITIONAL CONTEXT: ' + user_context if user_context else ''}\n\n"
         f"Return ONLY the queries, one per line. Make them specific and targeted to find recent news, "
         f"research papers, product announcements, incidents, and expert opinions."
     )
     queries_text = call_ollama(query_prompt, system="You are a research query generator. Return only the queries, nothing else.")
-    queries = [q.strip().lstrip("0123456789.-) ") for q in queries_text.strip().split("\n") if q.strip()][:6]
+    queries = [q.strip().lstrip("0123456789.-) ") for q in queries_text.strip().split("\n") if q.strip()][:num_queries]
     if not queries:
         queries = [topic]
 
@@ -3106,40 +3234,124 @@ def research_topic(topic: str, user_context: str = "", expl_id: str | None = Non
 
     findings_text = ""
     for f in findings:
-        findings_text += f"\nTitle: {f['title']}\nDate: {f['date']}\nURL: {f['url']}\nContent: {f['content'][:1200]}\n---\n"
+        findings_text += f"\nTitle: {f['title']}\nDate: {f['date']}\nURL: {f['url']}\nContent: {f['content'][:1500]}\n---\n"
 
-    prompt = (
-        f"You are a senior AI industry analyst and researcher.\n"
-        f"Today: {run_time.strftime('%B %d, %Y')}. Focus on the last {max_age} months only.\n"
-        f"{'User context: ' + user_context if user_context else ''}\n\n"
-        f"RESEARCH FINDINGS on: {topic}\n{findings_text}\n\n"
-        f"Produce a focused intelligence report:\n\n"
-        f"## Research Brief: {topic}\n\n"
-        f"### Overview\n(What is this topic about? Why does it matter right now? 2–3 sentences.)\n\n"
-        f"### Key Findings\n(Bullet list of specific, concrete discoveries from the research.)\n\n"
-        f"### Latest Developments\n(What is new and happening right now? Most recent news first.)\n\n"
-        f"### Key Players\n(Who are the main companies, researchers, or projects involved?)\n\n"
-        f"### Insights & Analysis\n(What does this mean? What trends or patterns emerge?)\n\n"
-        f"### What to Watch\n(3–5 specific signals or developments to track in the coming weeks.)\n"
-    )
+    context_line = f"User context: {user_context}\n" if user_context else ""
+    date_line    = f"Today: {run_time.strftime('%B %d, %Y')}.\n"
+
+    # Depth-scaled structure
+    depth_structures = {
+        1: (
+            f"## Overview\n(2–3 sentences. What is this? Why does it matter now?)\n\n"
+            f"## Key Findings\n(6 bullet points. Specific, concrete discoveries. Source and date on each.)\n\n"
+            f"## What to Watch\n(3 signals to track in the coming weeks.)"
+        ),
+        2: (
+            f"## Overview\n(3–4 sentences. What is this? Why does it matter?)\n\n"
+            f"## Key Findings\n(8 bullet points. Specific and concrete. Source and date on each.)\n\n"
+            f"## Latest Developments\n(What is new right now? Most recent first. 4–6 items.)\n\n"
+            f"## Key Players\n(Main companies, researchers, or projects involved.)\n\n"
+            f"## What to Watch\n(4 specific signals or events to track.)"
+        ),
+        3: (
+            f"## Overview\n(4–5 sentences. Full context on the topic.)\n\n"
+            f"## Key Findings\n(10 bullet points, specific and sourced.)\n\n"
+            f"## Latest Developments\n(Most recent news first. 6–8 items with dates.)\n\n"
+            f"## Key Players\n(Who are the main actors? What is their role?)\n\n"
+            f"## Insights & Analysis\n(5 numbered insights. What does this mean? Trends?)\n\n"
+            f"## What to Watch\n(5 concrete signals to monitor over the next 2–4 weeks.)"
+        ),
+        4: (
+            f"## Executive Summary\n(6 bullet points covering the most important findings.)\n\n"
+            f"## Background & Context\n(Full context on the topic. History, current state, why now.)\n\n"
+            f"## Key Findings\n(12 bullet points, specific and sourced.)\n\n"
+            f"## Latest Developments\n(8–10 recent items, most recent first.)\n\n"
+            f"## Key Players\n(Full breakdown of main actors and their roles.)\n\n"
+            f"## Insights & Analysis\n(6 numbered insights and trend analysis.)\n\n"
+            f"## Risks & Challenges\n(3–5 key risks or obstacles in this space.)\n\n"
+            f"## What to Watch\n(6 specific signals and upcoming events to track.)"
+        ),
+        5: (
+            f"## Executive Summary\n(8 bullet points. Most impactful findings first.)\n\n"
+            f"## Background & Context\n(Comprehensive context. History, current state, why this matters now.)\n\n"
+            f"## Key Findings\n(15 bullet points. Specific, sourced, detailed.)\n\n"
+            f"## Latest Developments\n(10–12 recent items, most recent first, with dates and sources.)\n\n"
+            f"## Key Players\n(Full breakdown of all major actors, their roles, and positions.)\n\n"
+            f"## Deep-Dive Analysis\n(8 numbered insights. Strategic implications, trends, patterns.)\n\n"
+            f"## Risks & Challenges\n(5 risks or obstacles. What could go wrong or slow progress?)\n\n"
+            f"## Opportunities\n(3–5 opportunities emerging from this space.)\n\n"
+            f"## What to Watch\n(8 specific signals, upcoming events, and milestones to track.)"
+        ),
+    }
+    structure = depth_structures[depth]
+    depth_label = {1: "1-page", 2: "2-page", 3: "3-page", 4: "4-page", 5: "5-page"}[depth]
+    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}[style]
+
+    if style == "qa":
+        qa_count = {1: 5, 2: 8, 3: 12, 4: 16, 5: 20}[depth]
+        prompt = (
+            f"You are an expert research analyst. {date_line}{context_line}\n"
+            f"RESEARCH FINDINGS on: {topic}\n{findings_text}\n\n"
+            f"Based on these findings, generate {qa_count} insightful question-and-answer pairs.\n\n"
+            f"## Research Brief: {topic}\n\n"
+            f"**Style**: Q&A\n\n"
+            + "\n\n".join([
+                f"### Q{n}: [Write a specific, probing question about {topic}]\n\n**A:** [Write a detailed, evidence-based answer drawn from the findings. Cite sources.]"
+                for n in range(1, qa_count + 1)
+            ])
+        )
+    elif style == "blog":
+        prompt = (
+            f"You are an expert technology journalist writing for a senior professional audience. {date_line}{context_line}\n"
+            f"RESEARCH FINDINGS on: {topic}\n{findings_text}\n\n"
+            f"Write a {depth_label} blog post about {topic} based on these findings.\n"
+            f"Structure: compelling title, strong hook opening, flowing narrative paragraphs, inline citations (Source, Date), conclusion.\n"
+            f"Depth guide: {structure}\n\n"
+            f"## [Write a compelling blog post title about {topic}]\n\n"
+            f"**Style**: Blog Post\n\n"
+        )
+    elif style == "story":
+        chapter_count = {1: 2, 2: 3, 3: 4, 4: 5, 5: 6}[depth]
+        prompt = (
+            f"You are a narrative journalist. {date_line}{context_line}\n"
+            f"RESEARCH FINDINGS on: {topic}\n{findings_text}\n\n"
+            f"Transform these findings into a compelling narrative story in {chapter_count} chapters.\n\n"
+            f"## [A dramatic, evocative title about {topic}]\n\n"
+            f"**Style**: Story\n\n"
+            f"### Prologue\n(Set the scene. Why does this topic matter right now?)\n\n"
+            + "\n\n".join([f"### Chapter {n}: [Evocative chapter title]\n(Narrative paragraphs. Weave in facts and sources naturally.)" for n in range(1, chapter_count + 1)])
+            + "\n\n### Epilogue: What Comes Next\n(Forward-looking conclusion. What should the reader watch for?)"
+        )
+    else:  # summary
+        prompt = (
+            f"You are a senior research analyst. {date_line}{context_line}\n"
+            f"RESEARCH FINDINGS on: {topic}\n{findings_text}\n\n"
+            f"Produce a {depth_label} intelligence brief structured exactly as follows:\n\n"
+            f"## Research Brief: {topic}\n\n"
+            f"**Style**: Quick Summary\n\n"
+            f"{structure}"
+        )
+
     body = call_ollama(prompt)
 
-    expl_slug = re.sub(r"[^a-z0-9]+", "_", expl_cfg.get("title", expl_id or "").lower()).strip("_")[:20] if expl_cfg else ""
-    topic_slug = topic.lower()[:30].replace(" ", "_").replace("/", "_")
-    filename = f"topic_{expl_slug}_{topic_slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md" if expl_slug else f"topic_{topic_slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    filepath = reports_dir / filename
+    # Save to dedicated adhoc reports directory
+    adhoc_dir = REPORTS_BASE_DIR / "__adhoc__"
+    topic_slug = re.sub(r"[^a-z0-9]+", "_", topic.lower())[:35].strip("_")
+    filename   = f"adhoc_{topic_slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
+    adhoc_dir.mkdir(parents=True, exist_ok=True)
+    filepath = adhoc_dir / filename
     header = (
         f"# Research Brief: {topic}\n"
         f"**Date**: {run_time.strftime('%A, %B %d, %Y — %H:%M:%S')}\n"
-        f"**Type**: Ad-hoc topic research\n"
-        f"**Sources**: {len(findings)} articles | **Queries used**: {len(queries)}\n"
-        f"{('**User context**: ' + user_context + chr(10)) if user_context else ''}"
+        f"**Type**: Adhoc research\n"
+        f"**Depth**: {depth_label} | **Style**: {style_label}\n"
+        f"**Sources**: {len(findings)} articles | **Queries**: {len(queries)}\n"
+        f"{('**Context**: ' + user_context + chr(10)) if user_context else ''}"
         f"\n---\n\n"
     )
     filepath.write_text(header + body)
-    log.info(f"Topic brief saved → {filepath}")
-    return {"status": "success", "topic": topic, "report": filename, "sources": len(findings)}
+    log.info(f"Adhoc brief saved → {filepath}")
+    return {"status": "success", "topic": topic, "report": filename, "sources": len(findings), "depth": depth, "style": style}
 
 
 @app.route("/api/reports/<expl_id>/<filename>", methods=["DELETE"])

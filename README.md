@@ -119,6 +119,8 @@ Browser → http://localhost:8888
 
 > **Other models:** Any model available in Ollama works. Larger models (e.g. llama3.3:70b on sufficient hardware) produce noticeably better reports. Smaller models (3b, 1b) work but synthesis quality drops.
 
+> **Security note:** Always review `run.sh` / `run.ps1` before executing setup scripts. The scripts only run `docker compose`, generate a local secret key, and optionally install Ollama via your package manager. No data is sent anywhere.
+
 ---
 
 ## Quick Start
@@ -144,11 +146,20 @@ ollama pull llama3.1:8b
 ```
 
 **Windows (PowerShell)**
+
+> **One-time PowerShell step (required on Windows):** By default, Windows blocks unsigned scripts. Run this once in an Administrator PowerShell session:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
+> ```
+> This only affects the current user and can be reversed with `RemoteSigned` or `Restricted` at any time.
+
 ```powershell
 .\run.ps1 setup
 ```
 
 This generates a SearXNG secret key and builds + starts all containers. Everything runs in Docker — no manual dependency installation needed.
+
+> **Note:** Both `run.sh` and `run.ps1` check whether Docker and Ollama are installed and will prompt you with download links or attempt an automatic install (Mac via Homebrew) if they are missing. Review the scripts before running them if you prefer to install dependencies manually.
 
 ### 4. Open the dashboard
 

@@ -9,7 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-AGENT_NAME="InfoExplorer Agent"
+AGENT_NAME="ScoutForge"
 DASHBOARD_PORT="${RESEARCH_PORT:-8888}"
 ENV_FILE=".env"
 COMPOSE="docker compose"
@@ -33,10 +33,19 @@ banner() {
 # ── Preflight checks ──────────────────────────────────────────────────────────
 check_env() {
   if [ ! -f "$ENV_FILE" ]; then
-    warn ".env not found — creating from .env.example"
-    cp .env.example .env
-    warn "Please edit .env and set your SEARXNG_URL port, then re-run."
-    exit 1
+    if [ -f ".env.example" ]; then
+      warn ".env not found — creating from .env.example"
+      cp .env.example "$ENV_FILE"
+    else
+      warn ".env not found — creating default"
+      cat > "$ENV_FILE" <<'EOF'
+OLLAMA_URL=http://host.docker.internal:11434
+REPORTS_DIR=./reports
+RESEARCH_PORT=8888
+RUN_ON_START=false
+EOF
+    fi
+    warn "Review .env if needed, then re-run."
   fi
   # Load env for port reading
   set -a; source "$ENV_FILE"; set +a
@@ -44,7 +53,28 @@ check_env() {
 }
 
 check_docker() {
+  if ! command -v docker &>/dev/null; then
+    error "Docker is not installed. Download Docker Desktop from https://www.docker.com/products/docker-desktop and re-run."
+  fi
   docker info &>/dev/null || error "Docker is not running. Start Docker Desktop first."
+}
+
+check_ollama() {
+  if ! command -v ollama &>/dev/null; then
+    warn "Ollama is not installed. Attempting to install via Homebrew..."
+    if command -v brew &>/dev/null; then
+      brew install ollama && success "Ollama installed via Homebrew." || {
+        error "Homebrew install failed. Install Ollama manually from https://ollama.com and re-run."
+      }
+    else
+      error "Ollama not found. Install it from https://ollama.com and re-run.\nOn macOS you can also run: brew install ollama"
+    fi
+  fi
+  # Ensure a model is available
+  if ! ollama list 2>/dev/null | grep -q .; then
+    info "No Ollama models found. Pulling default model (llama3.2)..."
+    ollama pull llama3.2 || warn "Could not pull llama3.2. Run 'ollama pull <model>' manually once Ollama is running."
+  fi
 }
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -52,6 +82,7 @@ check_docker() {
 cmd_start() {
   banner
   check_docker
+  check_ollama
   check_env
   info "Building and starting $AGENT_NAME..."
   $COMPOSE up -d --build
@@ -149,6 +180,7 @@ cmd_open() {
 cmd_setup() {
   banner
   check_docker
+  check_ollama
   check_env
 
   # Generate SearXNG secret key if still placeholder

@@ -58,9 +58,34 @@ RUN_ON_START=false
 }
 
 function Check-Docker {
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        Write-Err "Docker is not installed. Download Docker Desktop from https://www.docker.com/products/docker-desktop and re-run."
+    }
     try { docker info 2>&1 | Out-Null }
     catch { Write-Err "Docker is not running. Start Docker Desktop first." }
     if ($LASTEXITCODE -ne 0) { Write-Err "Docker is not running. Start Docker Desktop first." }
+}
+
+function Check-Ollama {
+    if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+        Write-Host ""
+        Write-Warn "Ollama is not installed."
+        Write-Host "  Install Ollama for Windows from: https://ollama.com" -ForegroundColor Cyan
+        Write-Host "  After installing, re-run this script." -ForegroundColor Yellow
+        Write-Host ""
+        exit 1
+    }
+    # Check if any model is available
+    $models = ollama list 2>$null
+    if (-not $models -or $models.Count -le 1) {
+        Write-Warn "No Ollama models found. Pulling default model (llama3.2)..."
+        ollama pull llama3.2
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Could not pull llama3.2. Run 'ollama pull <model>' manually once Ollama is running."
+        } else {
+            Write-Success "Default model llama3.2 pulled."
+        }
+    }
 }
 
 function Generate-Secret {
@@ -73,6 +98,7 @@ function Generate-Secret {
 function Cmd-Setup {
     Show-Banner
     Check-Docker
+    Check-Ollama
     Load-Env
 
     # Generate SearXNG secret key if still placeholder
@@ -102,6 +128,7 @@ function Cmd-Setup {
 function Cmd-Start {
     Show-Banner
     Check-Docker
+    Check-Ollama
     Load-Env
     Write-Info "Starting $AgentName..."
     docker compose up -d --build
