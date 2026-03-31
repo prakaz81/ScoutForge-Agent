@@ -25,6 +25,7 @@ import trafilatura
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, jsonify, render_template_string, request
+from tzlocal import get_localzone
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -33,6 +34,21 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger(__name__)
+
+# ── System Timezone Detection ─────────────────────────────────────────────────
+try:
+    # First check TZ environment variable (set by Docker or systemwide)
+    tz_env = os.environ.get("TZ")
+    if tz_env:
+        SYSTEM_TIMEZONE = tz_env
+        log.info(f"System timezone from TZ env: {SYSTEM_TIMEZONE}")
+    else:
+        # Fall back to tzlocal detection
+        SYSTEM_TIMEZONE = str(get_localzone())
+        log.info(f"System timezone detected: {SYSTEM_TIMEZONE}")
+except Exception as e:
+    SYSTEM_TIMEZONE = "UTC"
+    log.warning(f"Could not detect system timezone, using UTC: {e}")
 
 # ── Engine Config ─────────────────────────────────────────────────────────────
 CONFIG_PATH      = Path(os.getenv("CONFIG_PATH",      "/app/config.yaml"))
@@ -66,6 +82,7 @@ def _load_explorations() -> dict:
         return explorations
     for expl_dir in sorted(EXPLORATIONS_DIR.iterdir()):
         cfg_path = expl_dir / "config.yaml"
+        skills_path = expl_dir / "skills.md"
         if not expl_dir.is_dir() or not cfg_path.exists():
             continue
         try:
@@ -75,6 +92,11 @@ def _load_explorations() -> dict:
             ecfg["id"] = eid
             ecfg["_dir"] = expl_dir          # Path to exploration directory
             ecfg["_cfg_path"] = cfg_path     # Path to exploration config file
+            if skills_path.exists():
+                with open(skills_path) as f:
+                    ecfg["_skills"] = f.read()
+            else:
+                ecfg["_skills"] = ""
             explorations[eid] = ecfg
             log.info(f"Loaded exploration: {eid} ({ecfg.get('title', eid)})")
         except Exception as e:
@@ -165,10 +187,12 @@ def _parse_date(date_str: str):
 
 
 def _article_is_fresh(date_str: str, max_days: int) -> bool:
-    """Return True if the article has a parseable date within max_days. Drop if no date."""
+    """Return True if the article has a parseable date within max_days, or no date (assume recent)."""
+    if not date_str:
+        return True  # Allow articles without dates, assume they're recent
     dt = _parse_date(date_str)
     if dt is None:
-        return False
+        return True  # Allow articles with unparseable dates, assume they're recent
     cutoff = datetime.now(timezone.utc) - timedelta(days=max_days)
     return dt >= cutoff
 
@@ -306,7 +330,7 @@ Opens a modal. Enter a topic, optional context, a depth (1–5 pages), and a rep
 
 ASK REPORTS CHATBOT (main page, left column)
 Chat-style Q&A window with a topic selector dropdown:
-- All Topics: searches the 3 most recent reports from every topic (up to 8 total)
+- All Topics: searches the 3 most recent reports from every topic (up to 8 total), including adhoc reports
 - Specific topic: searches the last 5 reports from that topic only
 - Help Docs: answer questions from this ScoutForge user guide
 
@@ -454,8 +478,16 @@ def load_previous_reports(n: int, reports_dir: Path) -> str:
         return ""
     combined = ""
     for path in reports:
+        content = path.read_text()
+
+        # Skip reports with zero gathered articles to avoid over-deduping from empty runs
+        match = re.search(r"\*\*Articles gathered\*\*:\s*(\d+)", content)
+        if match and int(match.group(1)) == 0:
+            log.info(f"  Skipping empty report for dedup: {path.name}")
+            continue
+
         log.info(f"  Loading for dedup: {path.name}")
-        combined += f"\n\n=== PREVIOUS REPORT: {path.name} ===\n{path.read_text()[:4000]}"
+        combined += f"\n\n=== PREVIOUS REPORT: {path.name} ===\n{content[:4000]}"
     return combined
 
 
@@ -493,9 +525,23 @@ def filter_new_findings(findings_block: str, covered_topics: str) -> tuple[str, 
         ),
         system="You are a research deduplication assistant. Be strict — only keep genuinely new information."
     )
+
     original = findings_block.count("Title:")
-    kept     = filtered.count("Title:")
-    skipped  = max(0, original - kept)
+
+    if not filtered or not filtered.strip():
+        log.warning("Dedup failed or returned empty output; preserving all findings.")
+        return findings_block, original, 0
+
+    if "NO_NEW_FINDINGS" in filtered.upper():
+        log.info("Dedup result indicates no new findings.")
+        return "NO_NEW_FINDINGS", 0, original
+
+    kept = filtered.count("Title:")
+    if kept == 0 and original > 0:
+        log.warning("Dedup returned 0 kept items despite available findings; falling back to original findings.")
+        return findings_block, original, 0
+
+    skipped = max(0, original - kept)
     return filtered, kept, skipped
 
 
@@ -666,6 +712,8 @@ FORMATTING RULES:
     depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
     style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}[style]
 
+    skills = expl_cfg.get("_skills", "")
+
     # ── Style-specific prompts ────────────────────────────────────────
     if style == "qa":
         qa_count = {1: 6, 2: 10, 3: 14}[depth]
@@ -674,6 +722,9 @@ FORMATTING RULES:
 Today is {run_time.strftime('%B %d, %Y')}.
 All articles are from the last {max_days} days.
 {dedup_note}
+
+SKILLS AND FOCUS:
+{skills}
 
 FINDINGS:
 {filtered_findings}
@@ -707,6 +758,9 @@ Rules:
 Today is {run_time.strftime('%B %d, %Y')}.
 All developments are from the last {max_days} days.
 {dedup_note}
+
+SKILLS AND FOCUS:
+{skills}
 
 RESEARCH FINDINGS:
 {filtered_findings}
@@ -752,6 +806,9 @@ Today is {run_time.strftime('%B %d, %Y')}.
 All developments are from the last {max_days} days.
 {dedup_note}
 
+SKILLS AND FOCUS:
+{skills}
+
 RESEARCH FINDINGS:
 {filtered_findings}
 
@@ -794,6 +851,9 @@ Rules:
 Today is {run_time.strftime('%B %d, %Y')}.
 All articles have been pre-filtered to only include news from the last {max_days} days.
 {dedup_note}
+
+SKILLS AND FOCUS:
+{skills}
 
 Below are ONLY the new, unique findings gathered today (duplicates already removed):
 
@@ -1131,6 +1191,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             {% for expl in explorations %}
             <option value="{{ expl.id }}" {% if expl.id == active_expl_id %}selected{% endif %}>{{ expl.title }}</option>
             {% endfor %}
+            <option value="__adhoc__">🔍 Adhoc Reports</option>
             <option value="__help__">❓ Help Docs</option>
           </select>
         </div>
@@ -1783,8 +1844,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div style="font-weight:700;color:#111827;margin-bottom:6px">💬 Ask Reports — Chatbot</div>
             The <strong>Ask Reports</strong> panel on the left is a chatbot. Use the dropdown to choose scope:<br>
             <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
-              <li><strong>All Topics</strong> — last 3 reports from every topic (up to 8 total)</li>
+              <li><strong>All Topics</strong> — last 3 reports from every topic (up to 8 total), including adhoc reports</li>
               <li><strong>Specific topic</strong> — last 5 reports from that topic</li>
+              <li><strong>🔍 Adhoc Reports</strong> — last 5 adhoc reports</li>
               <li><strong>❓ Help Docs</strong> — asks questions about ScoutForge itself (this guide)</li>
             </ul>
             Questions and answers appear as conversation bubbles. All questions are screened for prompt injection — adversarial inputs are blocked.
@@ -3457,7 +3519,15 @@ def api_ask_all():
             rd = _reports_dir(eid)
             if rd.exists():
                 all_reports.extend(sorted(rd.glob("*.md"), reverse=True)[:3])
+        # Also include adhoc reports
+        adhoc_dir = REPORTS_BASE_DIR / "__adhoc__"
+        if adhoc_dir.exists():
+            all_reports.extend(sorted(adhoc_dir.glob("*.md"), reverse=True)[:3])
         all_reports = sorted(all_reports, key=lambda p: p.stat().st_mtime, reverse=True)[:8]
+    elif expl_id == "__adhoc__":
+        adhoc_dir = REPORTS_BASE_DIR / "__adhoc__"
+        if adhoc_dir.exists():
+            all_reports = sorted(adhoc_dir.glob("*.md"), reverse=True)[:5]
     else:
         rd = _reports_dir(expl_id)
         if rd.exists():
@@ -3893,10 +3963,12 @@ def health():
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 
 def _build_cron_trigger(s: dict) -> CronTrigger:
-    tz   = s.get("timezone", "UTC")
+    tz   = s.get("timezone", SYSTEM_TIMEZONE)
     hr   = s.get("hour", 7)
     mn   = s.get("minute", 0)
     freq = s.get("frequency", "daily")
+    if freq == "hourly":
+        freq = "hourly_1"
     if freq.startswith("hourly_"):
         n = int(freq.split("_")[1])
         return CronTrigger(hour=f"*/{n}", minute=0, timezone=tz)
@@ -3910,7 +3982,9 @@ def _build_cron_trigger(s: dict) -> CronTrigger:
 def _describe_schedule(s: dict) -> str:
     freq = s.get("frequency", "daily")
     t    = f"{s.get('hour', 7):02d}:{s.get('minute', 0):02d}"
-    tz   = s.get("timezone", "UTC")
+    tz   = s.get("timezone", SYSTEM_TIMEZONE)
+    if freq == "hourly":
+        freq = "hourly_1"
     if freq.startswith("hourly_"):
         n = int(freq.split("_")[1])
         label = "hour" if n == 1 else "hours"
@@ -3942,8 +4016,7 @@ def start_scheduler():
     if not EXPLORATIONS:
         log.warning("No explorations loaded — scheduler not started.")
         return
-    tz = next(iter(EXPLORATIONS.values())).get("schedule", {}).get("timezone", "UTC")
-    _scheduler = BackgroundScheduler(timezone=tz)
+    _scheduler = BackgroundScheduler(timezone="UTC")  # Use UTC for scheduler, jobs have their own tz
     for eid, ecfg in EXPLORATIONS.items():
         s = ecfg.get("schedule", {})
         _scheduler.add_job(
@@ -3952,7 +4025,7 @@ def start_scheduler():
             args=[eid],
             id=f"research_{eid}",
             replace_existing=True,
-            misfire_grace_time=86400,   # fire even if missed by up to 24h (e.g. after container restart)
+            misfire_grace_time=604800,   # fire even if missed by up to 7 days (e.g. after container restart)
             coalesce=True,              # only fire once if multiple runs were missed
         )
         log.info(f"Scheduled [{eid}]: {_describe_schedule(s)}")

@@ -8,7 +8,7 @@ ollama:
   temperature: 0.3
 
 research:
-  max_results_per_query: 5
+  max_results_per_query: 2
   fetch_article_content: true
   max_article_chars: 2000
 

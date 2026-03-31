@@ -22,3 +22,7 @@ env/
 .vscode/
 .idea/
 *.swp
+
+# Copilot internal
+.claude/
+.env.timezone

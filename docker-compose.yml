@@ -49,6 +49,7 @@ services:
       - ./agents/explorer/config.yaml:/app/config.yaml   # writable — model changes persist
       - ./explorations:/app/explorations                 # writable — schedule/skill edits persist
     environment:
+      - TZ=${TZ:-UTC}
       - SEARXNG_URL=http://research-searxng:8080
       - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
       - CONFIG_PATH=/app/config.yaml

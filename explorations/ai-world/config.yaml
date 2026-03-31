@@ -1,0 +1,128 @@
+id: ai-world
+title: "AIWorld"           # ≤15 chars — used in report filenames
+description: "AI industry news, agentic AI, security incidents, frameworks, compliance, and governance. Tracks the full AI and Securing AI landscape."
+
+schedule:
+  frequency: "daily"
+  hour: 10
+  minute: 0
+  day_of_week: "mon"
+  day: 1
+
+research:
+  time_range: ""
+  max_age_months: 3
+  dedup_against_last_n_reports: 2
+
+  topics:
+    - area: "AI Models — Buzz, Releases & Advances"
+      queries:
+        - new AI model release announcement buzz 2025 2026
+        - GPT Claude Gemini Llama Mistral Qwen Grok new release
+        - AI model benchmark record breakthrough new
+        - open source AI model trending community release
+        - reasoning model new capability announcement
+        - small language model SLM on-device new release
+        - multimodal AI model new capability announcement
+        - AI model controversy debate community buzz
+        - AI foundation model funding valuation news
+        - AI model jailbreak vulnerability safety news
+
+    - area: "Agentic AI — Buzz, News & Multi-Agent Systems"
+      queries:
+        - agentic AI news buzz trending 2025 2026
+        - AI agent new announcement launch community discussion
+        - multi-agent system new research breakthrough paper
+        - autonomous AI agent real world deployment news
+        - agentic AI drama controversy debate community
+        - AI agent tool use capability new announcement
+        - agentic AI open source project trending github
+        - AI agent startup product launch buzz
+        - multi-agent orchestration new approach trending
+        - agentic AI use case new enterprise deployment
+
+    - area: "Agent Ecosystems & Interoperability"
+      queries:
+        - MCP model context protocol news update trending
+        - A2A agent to agent protocol news update
+        - AI agent ecosystem news buzz 2025
+        - AI agent marketplace plugin registry launch news
+        - agent interoperability protocol standard news
+        - agentic AI open standard community buzz
+
+    - area: "AI Frameworks — Buzz, Releases & Updates"
+      queries:
+        - AI framework new release update buzz 2025 2026
+        - LangGraph LangChain new version release news
+        - AutoGen CrewAI new release feature update
+        - Azure AI Foundry SDK new feature announcement
+        - Google Vertex AI Agent Builder new update release
+        - AWS Bedrock agent new capability announcement
+        - N8N Dify Flowise new release update news
+        - OpenAI Agents SDK Anthropic agent new release
+        - Salesforce Agentforce ServiceNow new update
+        - Semantic Kernel new release Microsoft update
+        - AI framework controversy debate community trending
+        - new AI framework open source launch trending
+
+    - area: "Agentic Security Products, Startups & Buzz"
+      queries:
+        - agentic AI security product startup launch 2025 2026
+        - AI agent runtime security protection new product
+        - AI agent red team penetration testing tool new
+        - AI agent monitoring observability security new product
+        - AI agent identity access authorization product new
+        - AI security agent protection product launch news
+        - AI trust safety guardrail product new release
+        - agentic AI security startup funding Series A B raised
+        - AI agent policy enforcement governance product launch
+        - AI security company acquisition partnership announcement
+
+    - area: "AI Security Incidents, Attacks & Vulnerabilities"
+      queries:
+        - AI model attack incident breach news 2025 2026
+        - LLM prompt injection attack real world incident
+        - AI agent hacked compromised security incident
+        - AI system vulnerability CVE disclosed exploit
+        - AI jailbreak bypass new technique discovered
+        - AI data poisoning supply chain attack news
+        - AI agent malicious use cyberattack reported
+        - AI model stolen exfiltrated IP theft incident
+        - AI security incident response postmortem news
+        - AI red team finding vulnerability disclosed
+
+    - area: "AI Compliance & Regulation"
+      queries:
+        - AI regulation news policy announcement 2025 2026
+        - EU AI Act enforcement update compliance news
+        - US AI regulation executive order policy new
+        - UK China AI regulation policy announcement new
+        - NIST AI RMF guidance update new release
+        - OWASP LLM top 10 agentic update new release
+        - MITRE ATLAS AI attack framework update new
+        - ISO 42001 AI management standard update new
+        - AI liability legal ruling court case news
+        - GDPR AI data privacy enforcement ruling new
+
+    - area: "AI Governance & Trust"
+      queries:
+        - AI governance framework enterprise new announcement
+        - AI trust responsible deployment standard new
+        - OWASP AI security guidance new update release
+        - MITRE ATLAS AI threat taxonomy new update
+        - AI agent explainability transparency new research
+        - AI model risk management governance new guidance
+        - trustworthy AI framework NIST ISO new publication
+        - AI governance platform tool enterprise new launch
+        - AI agent human oversight control framework new
+        - AI red team guidance NIST OWASP new publication
+
+    - area: "AI Security Products & Competitive Landscape"
+      queries:
+        - AI security trust control layer platform new product
+        - agentic AI governance platform new launch 2025
+        - AI agent compliance monitoring observability new tool
+        - AI runtime security agent shield protection new
+        - enterprise AI safety guardrail platform announcement
+        - AI agent policy enforcement access control launch
+        - AI security posture management agentic new product
