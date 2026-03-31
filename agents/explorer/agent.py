@@ -1088,7 +1088,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <div class="overlay" id="helpModal">
   <div class="modal" style="max-width:780px">
     <div class="modal-head">
-      <h3>❓ Agent ScoutForge — Setup &amp; User Guide</h3>
+      <h3>❓ ScoutForge — Setup &amp; User Guide</h3>
       <button class="btn btn-secondary btn-sm" onclick="closeModal('helpModal')">✕ Close</button>
     </div>
     <div class="modal-body" style="padding:0">
@@ -1108,7 +1108,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🚀 Getting Started</h2>
 
         <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:20px">
-          <strong style="color:#1d4ed8">What is Agent ScoutForge?</strong><br>
+          <strong style="color:#1d4ed8">What is ScoutForge?</strong><br>
           A self-hosted research agent that automatically monitors any topic you define, searches the web across multiple query angles, deduplicates findings against past reports, and synthesises intelligence briefs using a local LLM — all running on your machine with no cloud dependencies.
         </div>
 
@@ -1318,7 +1318,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
       <!-- Footer -->
       <div style="padding:12px 18px;border-top:1px solid #f3f4f6;font-size:.72rem;color:#9ca3af;text-align:center">
-        Agent ScoutForge &nbsp;·&nbsp; Developed by <strong style="color:#6b7280">Prakash Narayanamoorthy</strong>
+        ScoutForge &nbsp;·&nbsp; Developed by <strong style="color:#6b7280">Prakash Narayanamoorthy</strong>
       </div>
 
     </div><!-- /modal-body -->
