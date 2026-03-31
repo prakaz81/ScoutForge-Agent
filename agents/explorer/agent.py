@@ -205,67 +205,28 @@ def _max_age_days(expl_cfg: dict) -> int:
 
 # ── Prompt Injection Guardrails ────────────────────────────────────────────────
 #
-# Two-stage defence applied to every article before it enters the LLM pipeline:
+# All pattern definitions, normalisation logic, and check functions live in the
+# guardrails module so they can be imported and reused at every LLM input/output
+# boundary without duplication.
 #
-#   Stage 1 — Static rule check (fast, no LLM)
-#   Stage 2 — LLM semantic check (catches indirect / subtle injection)
+# Two-stage defence applied to every article before it enters the LLM pipeline:
+#   Stage 1 — Static rule check via guardrails.check_article_static() (fast, no LLM)
+#   Stage 2 — LLM semantic check via _check_indirect_injection() (catches subtle injection)
+#
+# User inputs (chat questions, topic names, research goals, ad-hoc context) are
+# screened by guardrails.check_user_input() at every API endpoint that feeds the LLM.
 
-_DIRECT_INJECTION_PATTERNS = [
-    # Role / system override
-    r"ignore\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?|system)",
-    r"disregard\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?)",
-    r"forget\s+(everything|all)\s+(you\s+)?(know|were\s+told|have\s+been\s+told)",
-    r"you\s+are\s+now\s+(a\s+)?(new|different|unrestricted|evil|dan|jailbreak)",
-    r"(act|behave|respond)\s+as\s+(if\s+you\s+(are|were)\s+)?(a\s+)?(different|unrestricted|evil|jailbreak)",
-    r"new\s+(system\s+)?prompt\s*[:\-]",
-    r"override\s+(system|safety|all)\s+(prompt|instructions?|rules?|constraints?)",
-    r"\[system\s*\]",
-    r"<\s*system\s*>",
-    r"<\s*/?instruction\s*>",
-    # Role-play jailbreak attempts
-    r"\bDAN\b.{0,30}(mode|prompt|jailbreak)",
-    r"developer\s+mode\s+(enabled|activated|on)",
-    r"jailbreak\s+(mode|prompt|enabled)",
-    r"do\s+anything\s+now",
-    # Output manipulation
-    r"print\s+(the\s+)?(following|this)\s+(text|message|content|exactly)",
-    r"output\s+(only|exactly|the\s+following)",
-    r"respond\s+(only\s+)?with\s+[\"']",
-    r"your\s+(new\s+)?instructions?\s+(are|is)\s*:",
-    r"(from\s+now\s+on|henceforth).{0,40}(you\s+(must|will|should)|always)",
-    # Data exfiltration / SSRF via prompt
-    r"fetch\s+(the\s+)?(url|page|content)\s+(at|from)\s+https?://",
-    r"make\s+a\s+(get|post)\s+request\s+to",
-    r"send\s+(the\s+)?(output|response|result)\s+to\s+https?://",
-    r"http[s]?://[^\s]{5,}\s*(for\s+instructions?|to\s+get\s+instructions?)",
-    # Prompt boundary confusion
-    r"---+\s*(end\s+of\s+article|article\s+ends?\s+here)",
-    r"={3,}\s*(new\s+instructions?|system\s+prompt)",
-    r"```\s*system",
-    r"\[\s*(INST|SYS|SYSTEM)\s*\]",
-    r"<<\s*(SYS|SYSTEM|INST)\s*>>",
-]
-
-_COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _DIRECT_INJECTION_PATTERNS]
-
-# Extra patterns to catch jailbreak attempts in user chat inputs
-_USER_INPUT_EXTRA_PATTERNS = [
-    re.compile(r"\bDAN\b", re.IGNORECASE),
-    re.compile(r"\bjailbreak\b", re.IGNORECASE),
-    re.compile(r"ignore.{0,30}(instructions?|rules?|prompt)", re.IGNORECASE),
-    re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
-    re.compile(r"(act|pretend|behave)\s+as\s+(if\s+)?", re.IGNORECASE | re.DOTALL),
-    re.compile(r"(system|admin)\s+(prompt|override|mode)", re.IGNORECASE),
-]
+from guardrails import check_user_input, check_article_static  # noqa: E402
 
 
 def _check_user_question(question: str) -> bool:
-    """Return True if the question looks like a prompt injection attempt."""
-    for pat in _COMPILED_PATTERNS + _USER_INPUT_EXTRA_PATTERNS:
-        if pat.search(question):
-            log.warning(f"[GUARDRAIL] Blocked user question: {question[:120]!r}")
-            return True
-    return False
+    """Thin adapter kept for backwards compatibility within this file.
+
+    Prefer calling guardrails.check_user_input() directly in new code.
+    Returns True if the input should be blocked.
+    """
+    blocked, _reason = check_user_input(question, label="user question")
+    return blocked
 
 
 # ── Help Documentation (used for chatbot RAG) ─────────────────────────────────
@@ -367,13 +328,8 @@ CONTROL SCRIPT
 
 
 def _check_direct_injection(article: dict) -> tuple[bool, str]:
-    combined = f"{article.get('title', '')} {article.get('content', '')}"
-    for pat in _COMPILED_PATTERNS:
-        m = pat.search(combined)
-        if m:
-            snippet = combined[max(0, m.start() - 20): m.end() + 20].replace("\n", " ")
-            return True, f"direct injection pattern matched: «{snippet.strip()}»"
-    return False, ""
+    """Stage-1 static check — delegates to the guardrails module."""
+    return check_article_static(article)
 
 
 def _check_indirect_injection(article: dict) -> tuple[bool, str]:
@@ -3313,6 +3269,12 @@ def api_topic_research():
         style = "summary"
     if not topic:
         return jsonify({"error": "Provide a topic in the request body: {\"topic\": \"...\"}"}), 400
+    # Guardrail: screen topic and context for injection before they reach the LLM
+    blocked, reason = check_user_input(topic, label="adhoc topic")
+    if not blocked and context:
+        blocked, reason = check_user_input(context, label="adhoc context")
+    if blocked:
+        return jsonify({"error": f"⛔ Input blocked by the prompt injection guardrail: {reason}"}), 400
     result = {}
     def run(): nonlocal result; result.update(research_topic(topic, context, depth, style))
     t = Thread(target=run, daemon=True); t.start(); t.join(timeout=480)
@@ -3496,6 +3458,8 @@ def api_ask_all():
     expl_id  = body.get("expl_id") or DEFAULT_EXPL_ID or ""
     if not question:
         return jsonify({"error": "Provide a question"}), 400
+    if len(question) > 2000:
+        return jsonify({"error": "Question is too long. Please limit to 2000 characters."}), 400
 
     # Guardrail: block prompt injection attempts in user questions
     if _check_user_question(question):
@@ -3558,6 +3522,8 @@ def api_ask_report(expl_id: str, filename: str):
         return jsonify({"error": "Report not found"}), 404
     if not question:
         return jsonify({"error": "Provide a question"}), 400
+    if len(question) > 2000:
+        return jsonify({"error": "Question is too long. Please limit to 2000 characters."}), 400
     if _check_user_question(question):
         return jsonify({"error": "⛔ Your question was blocked by the prompt injection guardrail."}), 400
     content = filepath.read_text()
@@ -3702,6 +3668,12 @@ def api_topics_create():
     goal = body.get("goal", "").strip()
     if not name:
         return jsonify({"error": "Provide a topic name"}), 400
+    # Guardrail: screen name and goal before they are forwarded to the LLM
+    blocked, reason = check_user_input(name, label="topic name")
+    if not blocked and goal:
+        blocked, reason = check_user_input(goal, label="topic goal")
+    if blocked:
+        return jsonify({"error": f"⛔ Input blocked by the prompt injection guardrail: {reason}"}), 400
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
     if not slug:
         return jsonify({"error": "Invalid topic name"}), 400
