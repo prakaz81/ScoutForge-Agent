@@ -256,7 +256,7 @@ TOPIC TABS AND ACTIONS
 
 TOPIC MANAGEMENT (Topic Mgmt button)
 - AI News: ships pre-configured as the default topic (broad AI field coverage). Marked 📌 Default with a 🔒 lock — cannot be deleted.
-- Create: enter a topic name and description/goal; ScoutForge auto-generates skills and research queries using the LLM. The new tab appears without restart.
+- Create: enter a topic name and goal — ScoutForge auto-drafts a baseline Skills description and research queries. Review and refine them in Settings → Skills and Research Queries before the first run. Tip: use ChatGPT or any AI assistant to generate richer content, then paste it in. The new tab appears without restart.
 - Delete: permanently removes the topic, config, and all its reports. Protected topics show a lock icon instead of Delete.
 - Empty skill indicator: amber dot on tab when Skills description is empty.
 
@@ -1997,8 +1997,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="modal-body">
       <p style="font-size:.82rem;color:#6b7280;margin-bottom:14px">
         Each topic is an independent research stream with its own schedule, research queries, and reports.
-        Create a topic by name — then configure its research queries via <strong>config.yaml</strong> and
-        describe it via <strong>⚙️ Settings → Skills</strong>.
+        Create a topic by name and goal — ScoutForge will auto-draft a baseline Skills description and research queries.
+        Review and refine them in <strong>⚙️ Settings → Skills</strong> and <strong>Research Queries</strong> before your first run.
+        Tip: use ChatGPT or any AI assistant to generate richer skills and queries, then paste them in.
       </p>
       <!-- Create new topic -->
       <div style="margin-bottom:20px;padding:14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px">
