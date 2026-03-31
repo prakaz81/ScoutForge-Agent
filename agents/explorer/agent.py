@@ -41,6 +41,18 @@ OLLAMA_URL       = os.getenv("OLLAMA_URL",  "http://host.docker.internal:11434")
 SEARCH_PROVIDER  = os.getenv("SEARCH_PROVIDER", "searxng").lower()
 TAVILY_API_KEY   = os.getenv("TAVILY_API_KEY", "")
 
+# ── Tavily client (initialised once when provider is selected) ────────────────
+_tavily_client = None
+if SEARCH_PROVIDER == "tavily":
+    if not TAVILY_API_KEY:
+        log.warning("SEARCH_PROVIDER=tavily but TAVILY_API_KEY is not set — searches will fail")
+    else:
+        try:
+            from tavily import TavilyClient
+            _tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
+        except ImportError:
+            log.warning("tavily-python is not installed — pip install tavily-python")
+
 with open(CONFIG_PATH) as f:
     CFG = yaml.safe_load(f)
 
@@ -403,9 +415,10 @@ def _searxng_search(query: str, time_range: str = "") -> list[dict]:
 
 def _tavily_search(query: str, time_range: str = "") -> list[dict]:
     """Search via Tavily API. Returns results normalized to SearXNG schema."""
+    if _tavily_client is None:
+        log.warning("Tavily client not initialised — check TAVILY_API_KEY and tavily-python install")
+        return []
     try:
-        from tavily import TavilyClient
-        client = TavilyClient(api_key=TAVILY_API_KEY)
         params = {
             "query": query,
             "max_results": MAX_RESULTS,
@@ -416,13 +429,14 @@ def _tavily_search(query: str, time_range: str = "") -> list[dict]:
             time_range_map = {"day": "d", "week": "w", "month": "m", "year": "y"}
             mapped = time_range_map.get(time_range, time_range)
             params["time_range"] = mapped
-        response = client.search(**params)
+        response = _tavily_client.search(**params)
         results = []
         for r in response.get("results", []):
             results.append({
                 "title": r.get("title", ""),
                 "url": r.get("url", ""),
                 "content": r.get("content", ""),
+                "publishedDate": r.get("published_date", ""),
             })
         return results
     except Exception as e:
