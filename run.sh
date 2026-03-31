@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# InfoExplorer Agent — Control Script
+# ScoutForge — Mac / Linux Control Script
 # Usage: ./run.sh [command]
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ error()   { echo -e "${RED}✖  $*${NC}"; exit 1; }
 banner() {
   echo ""
   echo -e "${CYAN}╔══════════════════════════════════════════════╗${NC}"
-  echo -e "${CYAN}║   🤖  ${AGENT_NAME}          ║${NC}"
+  echo -e "${CYAN}║   🔭  ScoutForge — Agentic Research Agent    ║${NC}"
   echo -e "${CYAN}╚══════════════════════════════════════════════╝${NC}"
   echo ""
 }
@@ -61,17 +61,35 @@ check_docker() {
 
 check_ollama() {
   if ! command -v ollama &>/dev/null; then
-    warn "Ollama is not installed. Attempting to install via Homebrew..."
-    if command -v brew &>/dev/null; then
-      brew install ollama && success "Ollama installed via Homebrew." || {
-        error "Homebrew install failed. Install Ollama manually from https://ollama.com and re-run."
-      }
+    if [[ "$(uname)" == "Darwin" ]]; then
+      warn "Ollama is not installed. Attempting to install via Homebrew..."
+      if command -v brew &>/dev/null; then
+        brew install ollama \
+          && brew services start ollama \
+          && sleep 3 \
+          && success "Ollama installed and started." \
+          || error "Homebrew install failed. Install Ollama manually from https://ollama.com and re-run."
+      else
+        error "Ollama not found and Homebrew is unavailable.\nInstall Ollama from https://ollama.com, then re-run."
+      fi
     else
-      error "Ollama not found. Install it from https://ollama.com and re-run.\nOn macOS you can also run: brew install ollama"
+      # Linux / WSL
+      warn "Ollama is not installed. Running the official install script..."
+      curl -fsSL https://ollama.com/install.sh | sh \
+        && success "Ollama installed." \
+        || error "Ollama install failed. Install it manually from https://ollama.com and re-run."
     fi
   fi
-  # Ensure a model is available
-  if ! ollama list 2>/dev/null | grep -q .; then
+  # Start Ollama service if not already responding
+  if ! curl -sf http://localhost:11434 &>/dev/null; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+      info "Starting Ollama service..."
+      brew services start ollama 2>/dev/null || ollama serve &>/dev/null &
+      sleep 3
+    fi
+  fi
+  # Ensure at least one model is available (skip header line)
+  if ! ollama list 2>/dev/null | tail -n +2 | grep -q .; then
     info "No Ollama models found. Pulling default model (llama3.2)..."
     ollama pull llama3.2 || warn "Could not pull llama3.2. Run 'ollama pull <model>' manually once Ollama is running."
   fi
@@ -188,7 +206,12 @@ cmd_setup() {
   if [ -f "$SEARXNG_SETTINGS" ] && grep -q "change-me-run-openssl-rand-hex-32" "$SEARXNG_SETTINGS" 2>/dev/null; then
     warn "Generating SearXNG secret key..."
     KEY=$(openssl rand -hex 32)
-    sed -i '' "s|change-me-run-openssl-rand-hex-32-and-paste-here|${KEY}|g" "$SEARXNG_SETTINGS"
+    # sed -i syntax differs: macOS needs '' argument, Linux does not
+    if [[ "$(uname)" == "Darwin" ]]; then
+      sed -i '' "s|change-me-run-openssl-rand-hex-32-and-paste-here|${KEY}|g" "$SEARXNG_SETTINGS"
+    else
+      sed -i "s|change-me-run-openssl-rand-hex-32-and-paste-here|${KEY}|g" "$SEARXNG_SETTINGS"
+    fi
     success "SearXNG secret key generated."
   fi
 

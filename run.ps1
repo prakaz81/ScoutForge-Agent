@@ -70,21 +70,44 @@ function Check-Ollama {
     if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
         Write-Host ""
         Write-Warn "Ollama is not installed."
-        Write-Host "  Install Ollama for Windows from: https://ollama.com" -ForegroundColor Cyan
-        Write-Host "  After installing, re-run this script." -ForegroundColor Yellow
+        Write-Host "  1. Download Ollama for Windows from: https://ollama.com" -ForegroundColor Cyan
+        Write-Host "  2. Run the installer, then re-run: .\run.ps1 setup" -ForegroundColor Yellow
         Write-Host ""
         exit 1
     }
-    # Check if any model is available
-    $models = ollama list 2>$null
-    if (-not $models -or $models.Count -le 1) {
-        Write-Warn "No Ollama models found. Pulling default model (llama3.2)..."
-        ollama pull llama3.2
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warn "Could not pull llama3.2. Run 'ollama pull <model>' manually once Ollama is running."
-        } else {
-            Write-Success "Default model llama3.2 pulled."
+    # Check if Ollama service is responding on port 11434
+    $ollamaUp = $false
+    try {
+        $resp = Invoke-WebRequest -Uri "http://localhost:11434" -TimeoutSec 3 -ErrorAction Stop
+        $ollamaUp = $true
+    } catch {}
+    if (-not $ollamaUp) {
+        Write-Warn "Ollama is installed but not running. Starting Ollama..."
+        Start-Process "ollama" -ArgumentList "serve" -WindowStyle Hidden
+        Start-Sleep -Seconds 4
+        try {
+            Invoke-WebRequest -Uri "http://localhost:11434" -TimeoutSec 5 -ErrorAction Stop | Out-Null
+            Write-Success "Ollama started."
+        } catch {
+            Write-Warn "Could not start Ollama automatically. Please launch the Ollama app from your Start Menu, then re-run."
+            exit 1
         }
+    }
+    # Check if any model is available (skip header line)
+    try {
+        $models = ollama list 2>&1
+        $modelLines = $models | Select-Object -Skip 1 | Where-Object { $_.Trim() -ne "" }
+        if (-not $modelLines) {
+            Write-Warn "No Ollama models found. Pulling default model (llama3.2)..."
+            ollama pull llama3.2
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "Could not pull llama3.2. Run 'ollama pull <model>' manually once Ollama is running."
+            } else {
+                Write-Success "Default model llama3.2 pulled."
+            }
+        }
+    } catch {
+        Write-Warn "Could not check Ollama models. Ensure Ollama is running and try again."
     }
 }
 
