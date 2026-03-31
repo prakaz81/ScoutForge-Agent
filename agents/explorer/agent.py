@@ -867,29 +867,32 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <body>
 <div class="shell">
 
-  <!-- Navigation: Topic Tabs + Topic Mgmt button -->
-  <div style="display:flex;align-items:stretch;gap:8px;margin-bottom:18px">
-    <div class="expl-tabs" style="flex:1;margin-bottom:0">
-      {% for expl in explorations %}
-      <a href="?expl={{ expl.id }}" class="expl-tab {% if expl.id == active_expl_id %}active{% endif %}">
-        {% if not expl.has_skill %}<span style="color:#f59e0b;font-size:.65rem;vertical-align:middle" title="No skill description set">●</span> {% endif %}{{ expl.title }}
-      </a>
-      {% endfor %}
+  <!-- Top brand bar: ScoutForge left · action buttons right -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #e5e7eb;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:1.6rem;line-height:1">🔭</span>
+      <div>
+        <div style="font-size:1.2rem;font-weight:800;color:#111827;letter-spacing:-.01em">ScoutForge</div>
+        <div style="font-size:.68rem;color:#6b7280;margin-top:1px">Agentic curated topic research &amp; intelligence synthesis · Local AI · No cloud · No subscriptions</div>
+      </div>
     </div>
-    <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
-    <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openModal('helpModal')">❓ Help</button>
-    <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openModal('creditsModal')">★ Credits</button>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;padding:4px 12px;font-size:.73rem;font-weight:600;color:#15803d;white-space:nowrap">🤖 Model Connected: {{ model }}</span>
+      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openAdhocSearchModal()">🔍 Adhoc Search</button>
+      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
+      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openModal('helpModal')">❓ Help</button>
+      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openModal('creditsModal')">★ Credits</button>
+      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openSettingsModal()">⚙️ Settings</button>
+    </div>
   </div>
 
-  <!-- Header -->
-  <div class="header">
-    <span class="header-icon">🔭</span>
-    <div>
-      <h1>ScoutForge{% if explorations|length > 1 %} · {{ active_expl_title }}{% endif %}</h1>
-      <div class="header-sub">Agentic curated topic research &amp; intelligence synthesis · Local AI · No cloud · No subscriptions</div>
-    </div>
-    <span style="display:inline-flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:600;color:#2563eb">🤖 {{ model }}</span>
-    <button class="btn btn-link" onclick="openSettingsModal()" title="Settings">⚙️ Settings</button>
+  <!-- Topic Tabs -->
+  <div class="expl-tabs" style="margin-bottom:18px">
+    {% for expl in explorations %}
+    <a href="?expl={{ expl.id }}" class="expl-tab {% if expl.id == active_expl_id %}active{% endif %}">
+      {% if not expl.has_skill %}<span style="color:#f59e0b;font-size:.65rem;vertical-align:middle" title="No skill description set">●</span> {% endif %}{{ expl.title }}
+    </a>
+    {% endfor %}
   </div>
 
   <!-- About (from skills file) -->
@@ -944,74 +947,23 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Ask All Reports -->
-      <div class="card">
-        <div class="card-title">Ask All Reports <span style="font-size:.65rem;color:#475569;font-weight:400;text-transform:none">(RAG across all saved reports)</span></div>
-        <div class="input-row">
-          <input type="text" id="askInput" placeholder="Ask anything to search across past generated research reports..." onkeydown="if(event.key==='Enter')askAll()">
-          <button class="btn btn-secondary" onclick="askAll()" id="askBtn">Ask</button>
-        </div>
-        <div class="answer-box" id="askAnswer">
-          <div class="answer-meta" id="askMeta"></div>
-          <div class="answer-text" id="askText"></div>
-        </div>
-      </div>
-
-      <!-- Schedule -->
-      <div class="card">
-        <div class="card-title">Schedule <span style="font-size:.65rem;color:#475569;font-weight:400;text-transform:none" id="schedDesc">{{ schedule_desc }} · Next: {{ next_run }}</span></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
-          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">
-            <label style="font-size:.72rem;color:#6b7280;font-weight:600">Frequency</label>
-            <select id="schedFreq" onchange="onFreqChange()">
-              <option value="daily" {% if schedule_freq=='daily' %}selected{% endif %}>Daily</option>
-              <option value="weekly" {% if schedule_freq=='weekly' %}selected{% endif %}>Weekly</option>
-              <option value="monthly" {% if schedule_freq=='monthly' %}selected{% endif %}>Monthly</option>
-            </select>
-          </div>
-          <div id="schedDowWrap" style="display:{% if schedule_freq=='weekly' %}flex{% else %}none{% endif %};flex-direction:column;gap:4px;flex:1;min-width:110px">
-            <label style="font-size:.72rem;color:#6b7280;font-weight:600">Day of Week</label>
-            <select id="schedDow">
-              {% for d,l in [('mon','Monday'),('tue','Tuesday'),('wed','Wednesday'),('thu','Thursday'),('fri','Friday'),('sat','Saturday'),('sun','Sunday')] %}
-              <option value="{{ d }}" {% if schedule_dow==d %}selected{% endif %}>{{ l }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div id="schedDayWrap" style="display:{% if schedule_freq=='monthly' %}flex{% else %}none{% endif %};flex-direction:column;gap:4px;flex:1;min-width:80px">
-            <label style="font-size:.72rem;color:#6b7280;font-weight:600">Day of Month</label>
-            <input type="number" id="schedDay" min="1" max="28" value="{{ schedule_day }}" style="width:100%">
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <label style="font-size:.72rem;color:#6b7280;font-weight:600">Time</label>
-            <div style="display:flex;gap:4px;align-items:center">
-              <input type="number" id="schedHour" min="0" max="23" value="{{ schedule_hour }}" style="width:60px">
-              <span style="color:#6b7280">:</span>
-              <input type="number" id="schedMin" min="0" max="59" value="{{ '%02d'|format(schedule_minute) }}" style="width:60px">
-            </div>
-          </div>
-          <button class="btn btn-secondary" onclick="saveSchedule()" id="schedBtn" style="flex-shrink:0">💾 Save</button>
-        </div>
-        <div id="schedMsg" style="font-size:.78rem;color:#6b7280;min-height:1.2em"></div>
-      </div>
-
-      <!-- Custom Topic Research -->
-      <div class="card">
-        <div class="card-title">Live Topic Research <span style="font-size:.65rem;color:#475569;font-weight:400;text-transform:none">(live web search → new report)</span></div>
-        <div class="input-row" style="margin-bottom:8px">
-          <input type="text" id="topicInput" placeholder="e.g. MCP security risks, AI agent identity, EU AI Act enforcement 2025..."
-            onkeydown="if(event.key==='Enter')runTopicResearch()">
-          <select id="depthSelect" style="width:auto;min-width:130px">
-            <option value="1">1-pager (default)</option>
-            <option value="2">2-page brief</option>
-            <option value="3">3-page detailed</option>
-            <option value="4">4-page deep dive</option>
-            <option value="5">5-page full report</option>
+      <!-- Ask All Reports — Chatbot -->
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span>💬 Ask Reports <span style="font-size:.65rem;color:#475569;font-weight:400;text-transform:none">(RAG across saved reports)</span></span>
+          <select id="askTopicSelect" style="width:auto;min-width:140px;font-size:.75rem;padding:5px 8px">
+            <option value="__all__">All Topics</option>
+            {% for expl in explorations %}
+            <option value="{{ expl.id }}" {% if expl.id == active_expl_id %}selected{% endif %}>{{ expl.title }}</option>
+            {% endfor %}
           </select>
         </div>
-        <textarea id="topicContext" rows="2" style="margin-bottom:8px" placeholder="Optional: specific angle or context..."></textarea>
-        <button class="btn btn-secondary" onclick="runTopicResearch()" id="topicBtn">🔍 Research This Topic</button>
-        <div class="progress" id="topicProgress">
-          <span class="spin">⟳</span><span id="topicStatus" class="info">Researching...</span>
+        <div id="chatHistory" style="max-height:260px;overflow-y:auto;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:8px;min-height:72px">
+          <div style="text-align:center;color:#9ca3af;font-size:.78rem;padding:14px 0" id="chatEmpty">Ask a question about your research reports…</div>
+        </div>
+        <div class="input-row">
+          <input type="text" id="askInput" placeholder="Ask anything across your reports..." onkeydown="if(event.key==='Enter')askAll()">
+          <button class="btn btn-secondary" onclick="askAll()" id="askBtn">Ask</button>
         </div>
       </div>
 
@@ -1050,8 +1002,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
       <!-- Config -->
       <div class="config-bar">
-        📅 {{ schedule_desc }} &nbsp;|&nbsp;
-        🤖 {{ model }} &nbsp;|&nbsp;
+        📅 <span id="schedDescBar">{{ schedule_desc }}</span> · Next: <span id="schedNextBar">{{ next_run }}</span> &nbsp;|&nbsp;
         📂 {{ topic_count }} domains &nbsp;|&nbsp;
         🔄 Dedup last {{ dedup_n }} reports
       </div>
@@ -1076,6 +1027,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <button class="settings-tab"        id="tabBtnSkill"      onclick="switchTab('skill')">📋 Skills</button>
         <button class="settings-tab"        id="tabBtnQueries"    onclick="switchTab('queries')">🔍 Research Queries</button>
         <button class="settings-tab"        id="tabBtnTopic"      onclick="switchTab('topic')">⚙ Topic Settings</button>
+        <button class="settings-tab"        id="tabBtnSchedule"   onclick="switchTab('schedule')">📅 Schedule</button>
         <button class="settings-tab"        id="tabBtnGuardrails" onclick="switchTab('guardrails')">🛡️ Guardrails</button>
       </div>
 
@@ -1194,6 +1146,47 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div id="topicSettingsMsg" style="font-size:.78rem;min-height:1.2em;margin-top:14px"></div>
       </div>
 
+      <!-- Schedule Tab -->
+      <div id="tabSchedule" style="display:none;padding:20px 18px">
+        <p style="font-size:.82rem;color:#6b7280;margin-bottom:16px">
+          Configure when this topic's automated research run fires. Changes take effect immediately — no restart needed.
+        </p>
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:.78rem;color:#1e40af;margin-bottom:16px">
+          📅 Current: <strong id="schedDescModal">{{ schedule_desc }}</strong> &nbsp;·&nbsp; Next run: <strong id="schedNextModal">{{ next_run }}</strong>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">
+            <label style="font-size:.78rem;font-weight:600;color:#374151">Frequency</label>
+            <select id="schedFreq" onchange="onFreqChange()">
+              <option value="daily" {% if schedule_freq=='daily' %}selected{% endif %}>Daily</option>
+              <option value="weekly" {% if schedule_freq=='weekly' %}selected{% endif %}>Weekly</option>
+              <option value="monthly" {% if schedule_freq=='monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+          </div>
+          <div id="schedDowWrap" style="display:{% if schedule_freq=='weekly' %}flex{% else %}none{% endif %};flex-direction:column;gap:4px;flex:1;min-width:110px">
+            <label style="font-size:.78rem;font-weight:600;color:#374151">Day of Week</label>
+            <select id="schedDow">
+              {% for d,l in [('mon','Monday'),('tue','Tuesday'),('wed','Wednesday'),('thu','Thursday'),('fri','Friday'),('sat','Saturday'),('sun','Sunday')] %}
+              <option value="{{ d }}" {% if schedule_dow==d %}selected{% endif %}>{{ l }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div id="schedDayWrap" style="display:{% if schedule_freq=='monthly' %}flex{% else %}none{% endif %};flex-direction:column;gap:4px;flex:1;min-width:80px">
+            <label style="font-size:.78rem;font-weight:600;color:#374151">Day of Month</label>
+            <input type="number" id="schedDay" min="1" max="28" value="{{ schedule_day }}" style="width:100%">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:.78rem;font-weight:600;color:#374151">Time (24h)</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="number" id="schedHour" min="0" max="23" value="{{ schedule_hour }}" style="width:65px">
+              <span style="color:#6b7280">:</span>
+              <input type="number" id="schedMin" min="0" max="59" value="{{ '%02d'|format(schedule_minute) }}" style="width:65px">
+            </div>
+          </div>
+        </div>
+        <div id="schedMsg" style="font-size:.78rem;color:#6b7280;min-height:1.2em;margin-top:4px"></div>
+      </div>
+
       <!-- Guardrails Tab -->
       <div id="tabGuardrails" style="display:none;padding:16px 18px">
         <p style="font-size:.82rem;color:#6b7280;margin-bottom:12px">
@@ -1245,6 +1238,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="footTopic" style="display:none;gap:8px">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
         <button class="btn btn-primary" onclick="saveTopicSettings()">💾 Save Settings</button>
+      </div>
+      <div id="footSchedule" style="display:none;gap:8px">
+        <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSchedule()" id="schedBtn">💾 Save Schedule</button>
       </div>
       <div id="footGuardrails" style="display:none">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Close</button>
@@ -1604,6 +1601,67 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 </div>
 
+<!-- ── Adhoc Search Modal ─────────────────────────────────────────── -->
+<div class="overlay" id="adhocSearchModal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head">
+      <h3>🔍 Adhoc Topic Search</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('adhocSearchModal')">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.82rem;color:#6b7280;margin-bottom:14px">
+        Run a live web search on any topic and save the results as a report. Independent of your scheduled research areas.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Topic to research</label>
+          <input type="text" id="adhocTopicInput" placeholder="e.g. MCP security risks, AI agent identity, EU AI Act 2025..."
+            onkeydown="if(event.key==='Enter')runAdhocSearch()">
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Additional context (optional)</label>
+          <textarea id="adhocContextInput" rows="2" placeholder="Specific angle, scope, or background context..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Report Depth</label>
+            <select id="adhocDepthSelect">
+              <option value="1">1-pager (default)</option>
+              <option value="2">2-page brief</option>
+              <option value="3">3-page detailed</option>
+              <option value="4">4-page deep dive</option>
+              <option value="5">5-page full report</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Save under Topic</label>
+            <select id="adhocExplSelect">
+              {% for expl in explorations %}
+              <option value="{{ expl.id }}" {% if expl.id == active_expl_id %}selected{% endif %}>{{ expl.title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div id="adhocOutput" style="display:none;margin-top:4px">
+        <div id="adhocProgress" style="padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:.82rem;margin-bottom:10px">
+          <span class="spin">⟳</span><span id="adhocStatus" class="info">Starting search...</span>
+        </div>
+        <div id="adhocResult" style="display:none;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.83rem;color:#14532d">
+          ✔ Report saved: <strong id="adhocReportName"></strong>
+          <a id="adhocReportLink" href="#" target="_blank" style="margin-left:8px;color:#16a34a;text-decoration:underline">View →</a>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('adhocSearchModal')">Close</button>
+      <button class="btn btn-primary" onclick="runAdhocSearch()" id="adhocBtn">🔍 Search &amp; Generate Report</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const EXPL_ID = '{{ active_expl_id }}';
   let refreshTimer=null;
@@ -1664,62 +1722,118 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }catch(e){}
   })();
 
-  // ── Ask All Reports ───────────────────────────────────────────────
+  // ── Ask All Reports — Chatbot ─────────────────────────────────────
   async function askAll(){
     const q=document.getElementById('askInput').value.trim();
     if(!q){document.getElementById('askInput').focus();return;}
     const btn=document.getElementById('askBtn');
-    const box=document.getElementById('askAnswer');
-    const meta=document.getElementById('askMeta');
-    const txt=document.getElementById('askText');
-    btn.disabled=true; btn.textContent='⟳ Thinking...';
-    meta.textContent='Searching reports with Ollama — this takes ~30–60 seconds...';
-    txt.textContent='';
-    box.classList.add('show');
+    const hist=document.getElementById('chatHistory');
+    const topicVal=document.getElementById('askTopicSelect').value;
+    btn.disabled=true; btn.textContent='⟳';
+
+    // Hide empty placeholder
+    const empty=document.getElementById('chatEmpty');
+    if(empty) empty.style.display='none';
+
+    // User bubble
+    const qDiv=document.createElement('div');
+    qDiv.style.cssText='padding:8px 12px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0;font-size:.83rem;color:#1e40af;word-break:break-word;align-self:flex-end;max-width:90%';
+    qDiv.textContent=q;
+    hist.appendChild(qDiv);
+
+    // Answer bubble (loading)
+    const aDiv=document.createElement('div');
+    aDiv.style.cssText='padding:10px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;font-size:.83rem;color:#6b7280;white-space:pre-wrap;line-height:1.6;word-break:break-word;max-width:90%';
+    aDiv.textContent='⟳ Searching with Ollama — 30–60 seconds…';
+    hist.appendChild(aDiv);
+    hist.scrollTop=hist.scrollHeight;
+    document.getElementById('askInput').value='';
+
+    const payload=topicVal==='__all__'
+      ?{question:q,expl_id:'__all__'}
+      :{question:q,expl_id:topicVal};
     try {
-      const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,expl_id:EXPL_ID})});
+      const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const d=await r.json();
       if(d.error){
-        meta.textContent='⚠ Error: '+d.error;
-        txt.textContent='';
+        aDiv.style.color='#dc2626';
+        aDiv.textContent='⚠ '+d.error;
       } else {
-        meta.textContent='Searched '+d.reports_searched.length+' report(s): '+d.reports_searched.map(n=>n.replace(/\.md$/,'')).join(', ');
-        txt.textContent=d.answer;
+        aDiv.style.color='#111827';
+        aDiv.textContent=d.answer;
+        const meta=document.createElement('div');
+        meta.style.cssText='font-size:.68rem;color:#9ca3af;margin-top:6px';
+        const label=topicVal==='__all__'?'All Topics':'Topic: '+topicVal;
+        meta.textContent=label+' · '+d.reports_searched.length+' report(s) searched';
+        aDiv.appendChild(meta);
       }
     } catch(e){
-      meta.textContent='⚠ Request failed: '+e.message;
-      txt.textContent='Check that the agent is running and Ollama is reachable.';
+      aDiv.style.color='#dc2626';
+      aDiv.textContent='⚠ Request failed: '+e.message;
     }
+    hist.scrollTop=hist.scrollHeight;
     btn.disabled=false; btn.textContent='Ask';
+    document.getElementById('askInput').focus();
   }
 
-  // ── Topic Research ────────────────────────────────────────────────
-  async function runTopicResearch(){
-    const topic=document.getElementById('topicInput').value.trim();
-    const context=document.getElementById('topicContext').value.trim();
-    if(!topic){document.getElementById('topicInput').focus();return;}
-    const depth=parseInt(document.getElementById('depthSelect').value)||1;
-    const btn=document.getElementById('topicBtn');
-    const prog=document.getElementById('topicProgress');
+  // ── Adhoc Search Modal ────────────────────────────────────────────
+  function openAdhocSearchModal(){
+    document.getElementById('adhocTopicInput').value='';
+    document.getElementById('adhocContextInput').value='';
+    document.getElementById('adhocOutput').style.display='none';
+    document.getElementById('adhocResult').style.display='none';
+    openModal('adhocSearchModal');
+    setTimeout(()=>document.getElementById('adhocTopicInput').focus(),100);
+  }
+
+  async function runAdhocSearch(){
+    const topic=document.getElementById('adhocTopicInput').value.trim();
+    const context=document.getElementById('adhocContextInput').value.trim();
+    if(!topic){document.getElementById('adhocTopicInput').focus();return;}
+    const depth=parseInt(document.getElementById('adhocDepthSelect').value)||1;
+    const expl_id=document.getElementById('adhocExplSelect').value||EXPL_ID;
+    const btn=document.getElementById('adhocBtn');
+    const out=document.getElementById('adhocOutput');
+    const prog=document.getElementById('adhocProgress');
+    const res=document.getElementById('adhocResult');
     btn.disabled=true; btn.textContent='⟳ Researching...';
-    prog.classList.add('show');
-    document.getElementById('topicStatus').textContent='Searching the web for: "'+topic+'"...';
+    out.style.display='block';
+    prog.style.display='block';
+    res.style.display='none';
+    document.getElementById('adhocStatus').className='info';
+    document.getElementById('adhocStatus').textContent='Searching the web for: "'+topic+'"…';
     try {
-      const r=await fetch('/api/research/topic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,context,depth,expl_id:EXPL_ID})});
+      const r=await fetch('/api/research/topic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,context,depth,expl_id})});
       const d=await r.json();
       if(d.error||d.status==='timeout'){
-        document.getElementById('topicStatus').className='err';
-        document.getElementById('topicStatus').textContent='✖ '+(d.error||'Research timed out');
+        document.getElementById('adhocStatus').className='err';
+        document.getElementById('adhocStatus').textContent='✖ '+(d.error||'Research timed out');
       } else {
-        document.getElementById('topicStatus').className='ok';
-        document.getElementById('topicStatus').textContent='✔ Report saved: '+(d.report||'done');
-        setTimeout(()=>location.reload(),2000);
+        prog.style.display='none';
+        res.style.display='block';
+        document.getElementById('adhocReportName').textContent=d.report||'report saved';
+        document.getElementById('adhocReportLink').href='/reports/'+expl_id+'/'+encodeURIComponent(d.report||'');
+        setTimeout(()=>location.reload(),3000);
       }
     } catch(e){
-      document.getElementById('topicStatus').className='err';
-      document.getElementById('topicStatus').textContent='✖ '+e.message;
+      document.getElementById('adhocStatus').className='err';
+      document.getElementById('adhocStatus').textContent='✖ '+e.message;
     }
-    btn.disabled=false; btn.textContent='🔍 Research This Topic';
+    btn.disabled=false; btn.textContent='🔍 Search & Generate Report';
+  }
+
+  // ── Schedule Tab (in Settings) ────────────────────────────────────
+  async function loadScheduleContent(){
+    const d=await(await fetch('/api/schedule?expl='+EXPL_ID)).json();
+    document.getElementById('schedFreq').value=d.frequency||'daily';
+    document.getElementById('schedHour').value=d.hour||7;
+    document.getElementById('schedMin').value=String(d.minute||0).padStart(2,'0');
+    if(document.getElementById('schedDow')) document.getElementById('schedDow').value=d.day_of_week||'mon';
+    if(document.getElementById('schedDay')) document.getElementById('schedDay').value=d.day||1;
+    onFreqChange();
+    document.getElementById('schedDescModal').textContent=d.description||'';
+    document.getElementById('schedNextModal').textContent=d.next_run||'—';
+    document.getElementById('schedMsg').textContent='';
   }
 
   // ── Settings Modal ────────────────────────────────────────────────
@@ -1729,7 +1843,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   }
 
   function switchTab(tab){
-    ['model','skill','queries','topic','guardrails'].forEach(t=>{
+    ['model','skill','queries','topic','schedule','guardrails'].forEach(t=>{
       const panel=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
       const btn=document.getElementById('tabBtn'+t.charAt(0).toUpperCase()+t.slice(1));
       const foot=document.getElementById('foot'+t.charAt(0).toUpperCase()+t.slice(1));
@@ -1741,6 +1855,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     if(tab==='guardrails')  loadGuardrails();
     if(tab==='queries')     loadQueriesContent();
     if(tab==='topic')       loadTopicSettingsContent();
+    if(tab==='schedule')    loadScheduleContent();
   }
 
   // ── Guardrails ─────────────────────────────────────────────────────
@@ -1916,6 +2031,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   document.getElementById('helpModal').addEventListener('click',function(e){
     if(e.target===this) closeModal('helpModal');
   });
+  document.getElementById('adhocSearchModal').addEventListener('click',function(e){
+    if(e.target===this) closeModal('adhocSearchModal');
+  });
+  document.getElementById('creditsModal').addEventListener('click',function(e){
+    if(e.target===this) closeModal('creditsModal');
+  });
 
   function switchHelpTab(tab){
     ['getting','topics','research','discord','schedule','trouble'].forEach(t=>{
@@ -1952,8 +2073,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       if(d.error){
         msg.textContent='⚠ '+d.error; msg.style.color='#dc2626';
       } else {
-        msg.textContent='✔ '+d.description+' · Next: '+d.next_run; msg.style.color='#16a34a';
-        document.getElementById('schedDesc').textContent=d.description+' · Next: '+d.next_run;
+        msg.textContent='✔ Saved — '+d.description+' · Next: '+d.next_run; msg.style.color='#16a34a';
+        const dm=document.getElementById('schedDescModal'); if(dm) dm.textContent=d.description;
+        const nm=document.getElementById('schedNextModal'); if(nm) nm.textContent=d.next_run;
+        const db=document.getElementById('schedDescBar');   if(db) db.textContent=d.description;
+        const nb=document.getElementById('schedNextBar');   if(nb) nb.textContent=d.next_run;
       }
     } catch(e){
       msg.textContent='⚠ '+e.message; msg.style.color='#dc2626';
@@ -2117,8 +2241,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const anyModalOpen=document.querySelector('.overlay.open');
     const askActive=document.getElementById('askBtn').disabled;
     const anyInputFocused=['INPUT','TEXTAREA'].includes(document.activeElement?.tagName);
-    const topicHasText=document.getElementById('topicInput').value.trim().length>0;
-    if(!anyModalOpen&&!askActive&&!anyInputFocused&&!topicHasText&&
+    if(!anyModalOpen&&!askActive&&!anyInputFocused&&
        !document.getElementById('runProgress').classList.contains('show'))
       location.reload();
   }
@@ -2618,24 +2741,35 @@ def api_ask_all():
     expl_id  = body.get("expl_id") or DEFAULT_EXPL_ID or ""
     if not question:
         return jsonify({"error": "Provide a question"}), 400
-    reports_dir = _reports_dir(expl_id)
-    if not reports_dir.exists():
+
+    # Collect reports — either all topics or a specific one
+    all_reports: list[Path] = []
+    if expl_id == "__all__":
+        for eid in EXPLORATIONS:
+            rd = _reports_dir(eid)
+            if rd.exists():
+                all_reports.extend(sorted(rd.glob("*.md"), reverse=True)[:3])
+        all_reports = sorted(all_reports, key=lambda p: p.stat().st_mtime, reverse=True)[:8]
+    else:
+        rd = _reports_dir(expl_id)
+        if rd.exists():
+            all_reports = sorted(rd.glob("*.md"), reverse=True)[:5]
+
+    if not all_reports:
         return jsonify({"error": "No reports found. Run a research run first."}), 404
-    reports = sorted(reports_dir.glob("*.md"), reverse=True)[:5]
-    if not reports:
-        return jsonify({"error": "No reports found. Run a research run first."}), 404
+
     context = ""
-    for path in reports:
+    for path in all_reports:
         context += f"\n\n===== REPORT: {path.name} =====\n{path.read_text()[:2500]}"
     answer = call_ollama(
-        f"RESEARCH REPORTS ({len(reports)}):\n{context}\n\nQUESTION: {question}",
+        f"RESEARCH REPORTS ({len(all_reports)}):\n{context}\n\nQUESTION: {question}",
         system=(
             "You are an expert analyst. Answer using ONLY information from the "
             "research reports provided. Be specific and cite report names/dates where possible. "
             "If the answer is not in the reports, say so clearly."
         )
     )
-    return jsonify({"answer": answer, "reports_searched": [p.name for p in reports]})
+    return jsonify({"answer": answer, "reports_searched": [p.name for p in all_reports]})
 
 
 @app.route("/api/ask/report/<expl_id>/<filename>", methods=["POST"])
