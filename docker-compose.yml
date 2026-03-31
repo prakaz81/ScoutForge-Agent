@@ -55,6 +55,8 @@ services:
       - EXPLORATIONS_DIR=/app/explorations
       - PORT=8888
       - RUN_ON_START=${RUN_ON_START:-false}
+      - SEARCH_PROVIDER=${SEARCH_PROVIDER:-searxng}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

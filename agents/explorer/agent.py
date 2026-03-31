@@ -38,6 +38,8 @@ CONFIG_PATH      = Path(os.getenv("CONFIG_PATH",      "/app/config.yaml"))
 EXPLORATIONS_DIR = Path(os.getenv("EXPLORATIONS_DIR", "/app/explorations"))
 SEARXNG_URL      = os.getenv("SEARXNG_URL", "http://searxng:8080")
 OLLAMA_URL       = os.getenv("OLLAMA_URL",  "http://host.docker.internal:11434")
+SEARCH_PROVIDER  = os.getenv("SEARCH_PROVIDER", "searxng").lower()
+TAVILY_API_KEY   = os.getenv("TAVILY_API_KEY", "")
 
 with open(CONFIG_PATH) as f:
     CFG = yaml.safe_load(f)
@@ -382,9 +384,10 @@ def screen_article(article: dict) -> tuple[bool, str]:
     return False, ""
 
 
-# ── SearXNG ───────────────────────────────────────────────────────────────────
+# ── Search Providers ──────────────────────────────────────────────────────────
 
-def search(query: str, time_range: str = "") -> list[dict]:
+def _searxng_search(query: str, time_range: str = "") -> list[dict]:
+    """Search via SearXNG (self-hosted)."""
     try:
         resp = requests.get(
             f"{SEARXNG_URL}/search",
@@ -396,6 +399,46 @@ def search(query: str, time_range: str = "") -> list[dict]:
     except Exception as e:
         log.warning(f"SearXNG search failed for '{query}': {e}")
         return []
+
+
+def _tavily_search(query: str, time_range: str = "") -> list[dict]:
+    """Search via Tavily API. Returns results normalized to SearXNG schema."""
+    try:
+        from tavily import TavilyClient
+        client = TavilyClient(api_key=TAVILY_API_KEY)
+        params = {
+            "query": query,
+            "max_results": MAX_RESULTS,
+            "search_depth": "basic",
+            "topic": "general",
+        }
+        if time_range:
+            time_range_map = {"day": "d", "week": "w", "month": "m", "year": "y"}
+            mapped = time_range_map.get(time_range, time_range)
+            params["time_range"] = mapped
+        response = client.search(**params)
+        results = []
+        for r in response.get("results", []):
+            results.append({
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "content": r.get("content", ""),
+            })
+        return results
+    except Exception as e:
+        log.warning(f"Tavily search failed for '{query}': {e}")
+        return []
+
+
+def search(query: str, time_range: str = "") -> list[dict]:
+    """Dispatch search to configured provider with optional fallback."""
+    if SEARCH_PROVIDER == "tavily":
+        results = _tavily_search(query, time_range)
+        if not results:
+            log.info(f"Tavily returned no results for '{query}', falling back to SearXNG")
+            results = _searxng_search(query, time_range)
+        return results
+    return _searxng_search(query, time_range)
 
 
 def fetch_content(url: str) -> str | None:
@@ -3615,6 +3658,7 @@ def api_discord_test():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "model": OLLAMA_MODEL, "searxng": SEARXNG_URL,
+                    "search_provider": SEARCH_PROVIDER,
                     "explorations": list(EXPLORATIONS.keys())})
 
 
