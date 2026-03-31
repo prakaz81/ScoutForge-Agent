@@ -133,9 +133,15 @@ def _log_guardrail_event(article: dict, reason: str) -> None:
 
 # Max article age per schedule frequency (days)
 _FREQUENCY_MAX_AGE = {
-    "daily":   2,    # 48 hours
-    "weekly":  10,
-    "monthly": 90,
+    "hourly_1": 1,
+    "hourly_2": 1,
+    "hourly_3": 1,
+    "hourly_4": 1,
+    "hourly_6": 1,
+    "hourly_8": 1,
+    "daily":    2,    # 48 hours
+    "weekly":   10,
+    "monthly":  90,
 }
 
 
@@ -1173,9 +1179,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div><!-- /grid2 -->
 
   <!-- Page footer -->
-  <div style="margin-top:24px;padding:12px 0;border-top:1px solid #e5e7eb;text-align:center;font-size:.7rem;color:#d1d5db">
-    ScoutForge &nbsp;·&nbsp; Local AI · No cloud · No subscriptions &nbsp;·&nbsp;
-    <button onclick="openModal('creditsModal')" style="background:none;border:none;color:#d1d5db;font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline dotted">★ Credits</button>
+  <div style="margin-top:24px;padding:12px 0;border-top:1px solid #e5e7eb;text-align:center;font-size:.7rem;color:#6b7280">
+    <button onclick="openModal('creditsModal')" style="background:none;border:none;color:#374151;font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline dotted;font-weight:600">★ Credits</button>
   </div>
 
 </div><!-- /shell -->
@@ -1340,9 +1345,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px">
             <label style="font-size:.78rem;font-weight:600;color:#374151">Frequency</label>
             <select id="schedFreq" onchange="onFreqChange()">
-              <option value="daily" {% if schedule_freq=='daily' %}selected{% endif %}>Daily</option>
-              <option value="weekly" {% if schedule_freq=='weekly' %}selected{% endif %}>Weekly</option>
-              <option value="monthly" {% if schedule_freq=='monthly' %}selected{% endif %}>Monthly</option>
+              <option value="hourly_1"  {% if schedule_freq=='hourly_1'  %}selected{% endif %}>Every 1 hour</option>
+              <option value="hourly_2"  {% if schedule_freq=='hourly_2'  %}selected{% endif %}>Every 2 hours</option>
+              <option value="hourly_3"  {% if schedule_freq=='hourly_3'  %}selected{% endif %}>Every 3 hours</option>
+              <option value="hourly_4"  {% if schedule_freq=='hourly_4'  %}selected{% endif %}>Every 4 hours</option>
+              <option value="hourly_6"  {% if schedule_freq=='hourly_6'  %}selected{% endif %}>Every 6 hours</option>
+              <option value="hourly_8"  {% if schedule_freq=='hourly_8'  %}selected{% endif %}>Every 8 hours</option>
+              <option value="daily"     {% if schedule_freq=='daily'     %}selected{% endif %}>Daily</option>
+              <option value="weekly"    {% if schedule_freq=='weekly'    %}selected{% endif %}>Weekly</option>
+              <option value="monthly"   {% if schedule_freq=='monthly'   %}selected{% endif %}>Monthly</option>
             </select>
           </div>
           <div id="schedDowWrap" style="display:{% if schedule_freq=='weekly' %}flex{% else %}none{% endif %};flex-direction:column;gap:4px;flex:1;min-width:110px">
@@ -1357,7 +1368,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <label style="font-size:.78rem;font-weight:600;color:#374151">Day of Month</label>
             <input type="number" id="schedDay" min="1" max="28" value="{{ schedule_day }}" style="width:100%">
           </div>
-          <div style="display:flex;flex-direction:column;gap:4px">
+          <div id="schedTimeWrap" style="display:{% if schedule_freq.startswith('hourly') %}none{% else %}flex{% endif %};flex-direction:column;gap:4px">
             <label style="font-size:.78rem;font-weight:600;color:#374151">Time (24h)</label>
             <div style="display:flex;gap:4px;align-items:center">
               <input type="number" id="schedHour" min="0" max="23" value="{{ schedule_hour }}" style="width:65px">
@@ -1496,63 +1507,176 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
       <!-- Getting Started -->
       <div id="helpTabGetting" style="padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
-        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🚀 Getting Started</h2>
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:4px">🚀 Set Up Your First Topic Exploration</h2>
+        <p style="font-size:.8rem;color:#6b7280;margin-bottom:18px">Follow these steps end-to-end to go from zero to your first automated research brief.</p>
 
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:20px">
-          <strong style="color:#1d4ed8">What is ScoutForge?</strong><br>
-          A self-hosted research agent that automatically monitors any topic you define, searches the web across multiple query angles, deduplicates findings against past reports, and synthesises intelligence briefs using a local LLM — all running on your machine with no cloud dependencies. No API keys. No subscriptions.
-        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
 
-        <div style="display:flex;flex-direction:column;gap:12px">
-
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">① Prerequisites</div>
-            <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:4px">
-              <li><strong>Docker Desktop</strong> — must be running on your Mac</li>
-              <li><strong>Ollama</strong> — installed and running on the Mac host (<code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">brew install ollama</code> or <a href="https://ollama.com" target="_blank" style="color:#2563eb">ollama.com</a>)</li>
-              <li><strong>A model pulled in Ollama</strong> — default is <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">llama3.1:8b</code> — pull with:<br>
-                <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">ollama pull llama3.1:8b</code></li>
-            </ul>
+          <!-- Step 1 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">1</span>
+              Check prerequisites
+            </div>
+            <div style="padding:12px 14px">
+              Make sure all three are in place before continuing:
+              <ul style="list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:6px">
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="color:#22c55e;font-weight:700;flex-shrink:0">✔</span><span><strong>Docker Desktop</strong> — running on your Mac</span></li>
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="color:#22c55e;font-weight:700;flex-shrink:0">✔</span><span><strong>Ollama</strong> — installed on the Mac host. Check: <code style="background:#f3f4f6;border-radius:4px;padding:1px 6px">ollama list</code></span></li>
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="color:#22c55e;font-weight:700;flex-shrink:0">✔</span><span><strong>Model pulled</strong> — default is <code style="background:#f3f4f6;border-radius:4px;padding:1px 6px">llama3.1:8b</code>. Pull it with:<br><code style="background:#f3f4f6;border-radius:4px;padding:1px 6px">ollama pull llama3.1:8b</code></span></li>
+              </ul>
+            </div>
           </div>
 
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">② Start the stack</div>
-            <code style="background:#111827;color:#e5e7eb;border-radius:8px;padding:10px 14px;display:block;font-size:.82rem">cd ScoutForge<br>./run.sh setup    # first time — generates keys, builds &amp; starts<br>./run.sh start    # subsequent starts</code>
-            Then open <strong>http://localhost:8888</strong>
+          <!-- Step 2 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">2</span>
+              Start ScoutForge
+            </div>
+            <div style="padding:12px 14px">
+              In the ScoutForge directory, run:
+              <code style="background:#111827;color:#e5e7eb;border-radius:8px;padding:8px 12px;display:block;font-size:.8rem;margin:8px 0">./run.sh setup    # first time only<br>./run.sh start    # subsequent starts</code>
+              Then open <strong>http://localhost:8888</strong> in your browser. The 🤖 Model Connected badge in the top bar confirms Ollama is reachable.
+            </div>
           </div>
 
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">③ Create your first topic</div>
-            Click <strong>⊕ Topic Mgmt</strong> in the top bar → enter a <strong>name</strong> and a <strong>goal description</strong> (2–3 sentences about what you want to monitor) → click <strong>✨ Create &amp; Auto-Configure</strong>.<br>
-            <span style="font-size:.82rem;color:#6b7280">ScoutForge uses the goal to auto-generate a Skills description and initial research queries via the LLM (~30 seconds). The new topic tab appears immediately.</span>
+          <!-- Step 3 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">3</span>
+              Create a new topic
+            </div>
+            <div style="padding:12px 14px">
+              Click <strong>⊕ Topic Mgmt</strong> in the top bar, then fill in:
+              <ul style="list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:6px">
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="color:#6366f1;font-weight:700;flex-shrink:0">→</span><span><strong>Topic name</strong> — short label, e.g. <em>AI Security</em>, <em>EU Regulation</em>, <em>Crypto Markets</em></span></li>
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="color:#6366f1;font-weight:700;flex-shrink:0">→</span><span><strong>Goal description</strong> (required, 2–4 sentences) — describe what you want to monitor and why. Be specific: name the domains, risk areas, product lines, or regions you care about. The more detail here, the better the auto-generated queries and skills will be.<br>
+                  <span style="font-size:.78rem;color:#6b7280;display:block;margin-top:4px;background:#f9fafb;border-left:3px solid #6366f1;padding:4px 8px;border-radius:0 6px 6px 0">Example: <em>"I want to track AI security incidents, CVE disclosures affecting LLM systems, and emerging governance frameworks. Focus on enterprise risk and practical defensive mitigations."</em></span>
+                </span></li>
+              </ul>
+              <div style="margin-top:10px">Click <strong>✨ Create &amp; Auto-Configure</strong>. ScoutForge generates a Skills description and 3 research areas × 4 queries using the LLM (~30 seconds). The new topic tab appears immediately.</div>
+            </div>
           </div>
 
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">④ Review &amp; refine</div>
-            Click <strong>⚙️ Settings</strong> (below the topic tabs) to review auto-generated content:<br>
-            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
-              <li><strong>📋 Skills</strong> — the AI-drafted description (edit as needed)</li>
-              <li><strong>🔍 Research Queries</strong> — 3 auto-generated areas × 4 queries each (add, edit, or remove)</li>
-              <li><strong>⚙ Topic Settings</strong> — report depth, style, dedup window, Discord webhook</li>
-              <li><strong>📅 Schedule</strong> — set when automated runs fire (daily/weekly/monthly)</li>
-            </ul>
+          <!-- Step 4 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">4</span>
+              Review the auto-generated Skills
+            </div>
+            <div style="padding:12px 14px">
+              Click <strong>⚙️ Settings</strong> (below the topic tabs) → <strong>📋 Skills</strong>.<br>
+              The Skills description is shown as the topic's "about" banner on the dashboard. Review the auto-generated text and:
+              <ul style="list-style:disc;padding-left:18px;margin:6px 0 0;display:flex;flex-direction:column;gap:3px">
+                <li>Edit freely — add focus areas, products, or constraints ScoutForge should be aware of</li>
+                <li>Or click <strong>✨ Auto Generate</strong> again to regenerate from the stored goal</li>
+                <li>Click <strong>💾 Save Skill</strong> when done</li>
+              </ul>
+            </div>
           </div>
 
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">⑤ Run your first research brief</div>
-            Click <strong>▶ Run Now</strong> (below the topic tabs). The run takes 4–10 minutes. A live progress card appears while running. When done, the report appears in the Generated Reports list on the right.
+          <!-- Step 5 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">5</span>
+              Review &amp; refine Research Queries
+            </div>
+            <div style="padding:12px 14px">
+              Still in Settings, open the <strong>🔍 Research Queries</strong> tab. You'll see 3 research areas each with 4 search queries.<br>
+              <ul style="list-style:disc;padding-left:18px;margin:6px 0 0;display:flex;flex-direction:column;gap:3px">
+                <li>Edit area names or individual queries to be more specific</li>
+                <li>Add more areas with <strong>+ Add Research Area</strong> (up to 5–6 works well)</li>
+                <li>Remove areas that aren't relevant</li>
+                <li>Click <strong>💾 Save Queries</strong> when done — changes take effect on the next run</li>
+              </ul>
+              <div style="margin-top:6px;font-size:.78rem;color:#6b7280">Tip: more targeted queries = fewer irrelevant articles = better reports.</div>
+            </div>
           </div>
 
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Top bar quick reference</div>
-            <table style="width:100%;font-size:.8rem;border-collapse:collapse">
-              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🤖 Model Connected</td><td style="padding:4px 8px;color:#6b7280">Shows the active Ollama model</td></tr>
-              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">🔍 Adhoc Search</td><td style="padding:4px 8px;color:#6b7280">One-off live research on any topic</td></tr>
-              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">⊕ Topic Mgmt</td><td style="padding:4px 8px;color:#6b7280">Create or delete topics</td></tr>
-              <tr style="background:#f9fafb"><td style="padding:4px 8px;font-weight:600;white-space:nowrap">❓ Help</td><td style="padding:4px 8px;color:#6b7280">This guide</td></tr>
-              <tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap">★ Credits</td><td style="padding:4px 8px;color:#6b7280">Developer info &amp; open source stack (link at page footer)</td></tr>
+          <!-- Step 6 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">6</span>
+              Configure Topic Settings
+            </div>
+            <div style="padding:12px 14px">
+              In Settings → <strong>⚙ Topic Settings</strong>:
+              <ul style="list-style:disc;padding-left:18px;margin:6px 0 0;display:flex;flex-direction:column;gap:3px">
+                <li><strong>Report Depth</strong> — 1-pager (fast summary), 2-pager (adds key insights), 3-pager (full detail + watch list)</li>
+                <li><strong>Report Style</strong> — Quick Summary, Q&amp;A, Blog Post, or Story</li>
+                <li><strong>Max Article Age</strong> — filter out older content (e.g. 1 month keeps things current)</li>
+                <li><strong>Dedup Window</strong> — how many past reports to deduplicate against (2–3 recommended)</li>
+              </ul>
+              Click <strong>💾 Save Settings</strong> when done.
+            </div>
+          </div>
+
+          <!-- Step 7 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">7</span>
+              Set your schedule
+            </div>
+            <div style="padding:12px 14px">
+              In Settings → <strong>📅 Schedule</strong>:
+              <ul style="list-style:disc;padding-left:18px;margin:6px 0 0;display:flex;flex-direction:column;gap:3px">
+                <li>Choose <strong>Frequency</strong>: Daily, Weekly, or Monthly</li>
+                <li>Set the <strong>time</strong> (hour &amp; minute) and <strong>timezone</strong></li>
+                <li>For weekly/monthly, pick the <strong>day</strong></li>
+              </ul>
+              Click <strong>💾 Save Schedule</strong> — takes effect immediately, no restart needed. The next run time is shown below the topic tabs.
+            </div>
+          </div>
+
+          <!-- Step 8 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#0f4c23;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#22c55e;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">8</span>
+              Run your first research brief
+            </div>
+            <div style="padding:12px 14px">
+              Click <strong>▶ Run Now</strong> (below the topic tabs). A live progress card appears showing each step as it runs:
+              <ol style="padding-left:20px;margin:8px 0 0;display:flex;flex-direction:column;gap:3px">
+                <li>Searching the web across all configured areas</li>
+                <li>Extracting article content</li>
+                <li>Deduplicating against previous reports</li>
+                <li>Synthesising the brief with the LLM</li>
+                <li>Saving the report</li>
+              </ol>
+              <div style="margin-top:8px">Typical duration: <strong>4–10 minutes</strong> depending on the number of queries and model size. When complete, the report appears in the <strong>Generated Reports</strong> list.</div>
+            </div>
+          </div>
+
+          <!-- Step 9 -->
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">
+            <div style="background:#111827;color:#f9fafb;padding:8px 14px;font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:8px">
+              <span style="background:#3b82f6;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0">9</span>
+              View &amp; use your report
+            </div>
+            <div style="padding:12px 14px">
+              In the <strong>Generated Reports</strong> list, use the action icons:
+              <ul style="list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:5px">
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:.9rem">📄</span><span>Open the full HTML report viewer (Print / Save PDF from there)</span></li>
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:.9rem">💬</span><span>Chat with this specific report — ask any question, get a RAG answer</span></li>
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:.9rem;color:#5865f2">⬡</span><span>Send to Discord (if a webhook is configured in Topic Settings)</span></li>
+                <li style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:.9rem">🗑</span><span>Delete the report</span></li>
+              </ul>
+              <div style="margin-top:8px;font-size:.78rem;color:#6b7280">You can also use the <strong>💬 Ask Reports</strong> panel on the left to ask questions across all your reports at once.</div>
+            </div>
+          </div>
+
+          <!-- Top bar ref -->
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px">
+            <div style="font-weight:600;color:#374151;margin-bottom:8px;font-size:.82rem">Top bar quick reference</div>
+            <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+              <tr><td style="padding:3px 8px;font-weight:600;white-space:nowrap">🤖 Model Connected</td><td style="padding:3px 8px;color:#6b7280">Active Ollama model — click to change in Settings</td></tr>
+              <tr style="background:#f3f4f6"><td style="padding:3px 8px;font-weight:600;white-space:nowrap">🔍 Adhoc Search</td><td style="padding:3px 8px;color:#6b7280">One-off live research on any topic, saved instantly</td></tr>
+              <tr><td style="padding:3px 8px;font-weight:600;white-space:nowrap">⊕ Topic Mgmt</td><td style="padding:3px 8px;color:#6b7280">Create or delete topics</td></tr>
+              <tr style="background:#f3f4f6"><td style="padding:3px 8px;font-weight:600;white-space:nowrap">❓ Help</td><td style="padding:3px 8px;color:#6b7280">This guide</td></tr>
+              <tr><td style="padding:3px 8px;font-weight:600;white-space:nowrap">▶ Run Now</td><td style="padding:3px 8px;color:#6b7280">Below topic tabs — triggers full research for active topic</td></tr>
+              <tr style="background:#f3f4f6"><td style="padding:3px 8px;font-weight:600;white-space:nowrap">⚙️ Settings</td><td style="padding:3px 8px;color:#6b7280">Below topic tabs — all config for the active topic</td></tr>
             </table>
-            Below the topic tabs: <strong>▶ Run Now</strong> and <strong>⚙️ Settings</strong> apply to the active topic.
           </div>
 
         </div>
@@ -2291,8 +2415,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   // ── Schedule ──────────────────────────────────────────────────────
   function onFreqChange(){
     const f=document.getElementById('schedFreq').value;
+    const isHourly=f.startsWith('hourly');
     document.getElementById('schedDowWrap').style.display=f==='weekly'?'flex':'none';
     document.getElementById('schedDayWrap').style.display=f==='monthly'?'flex':'none';
+    document.getElementById('schedTimeWrap').style.display=isHourly?'none':'flex';
   }
 
   async function saveSchedule(){
@@ -3126,8 +3252,9 @@ def api_schedule_post():
     if not expl_cfg:
         return jsonify({"error": "Exploration not found"}), 404
     freq = body.get("frequency", "daily")
-    if freq not in ("daily", "weekly", "monthly"):
-        return jsonify({"error": "frequency must be daily, weekly, or monthly"}), 400
+    _valid_freqs = {"daily", "weekly", "monthly", "hourly_1", "hourly_2", "hourly_3", "hourly_4", "hourly_6", "hourly_8"}
+    if freq not in _valid_freqs:
+        return jsonify({"error": "Invalid frequency value"}), 400
     try:
         hour   = int(body.get("hour", 7))
         minute = int(body.get("minute", 0))
@@ -3493,6 +3620,9 @@ def _build_cron_trigger(s: dict) -> CronTrigger:
     hr   = s.get("hour", 7)
     mn   = s.get("minute", 0)
     freq = s.get("frequency", "daily")
+    if freq.startswith("hourly_"):
+        n = int(freq.split("_")[1])
+        return CronTrigger(hour=f"*/{n}", minute=0, timezone=tz)
     if freq == "weekly":
         return CronTrigger(day_of_week=s.get("day_of_week", "mon"), hour=hr, minute=mn, timezone=tz)
     elif freq == "monthly":
@@ -3504,6 +3634,10 @@ def _describe_schedule(s: dict) -> str:
     freq = s.get("frequency", "daily")
     t    = f"{s.get('hour', 7):02d}:{s.get('minute', 0):02d}"
     tz   = s.get("timezone", "UTC")
+    if freq.startswith("hourly_"):
+        n = int(freq.split("_")[1])
+        label = "hour" if n == 1 else "hours"
+        return f"Every {n} {label}"
     if freq == "weekly":
         day = s.get("day_of_week", "mon").capitalize()
         return f"Weekly on {day} at {t} ({tz})"
