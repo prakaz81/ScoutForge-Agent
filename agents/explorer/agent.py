@@ -442,6 +442,7 @@ def synthesize_advisory_report(
     skipped_count: int,
     is_first_report: bool,
     expl_cfg: dict,
+    depth: int = 1,
 ) -> str:
 
     if "NO_NEW_FINDINGS" in filtered_findings or new_count == 0:
@@ -458,9 +459,9 @@ def synthesize_advisory_report(
     )
 
     max_days = _max_age_days(expl_cfg)
+    areas    = [t["area"] for t in expl_cfg.get("research", {}).get("topics", [])]
 
-    # Build section instructions dynamically from the exploration's topic areas
-    areas = [t["area"] for t in expl_cfg.get("research", {}).get("topics", [])]
+    # ── Per-area section instructions (same across all depths) ────────
     area_sections = "\n\n".join(
         f"## {area}\n"
         f"(Numbered list. Each item: **[Source] [Date]:** 2–4 line summary. "
@@ -469,7 +470,76 @@ def synthesize_advisory_report(
         for area in areas
     )
 
-    prompt = f"""You are a senior analyst and researcher.
+    # ── Depth-specific structure ───────────────────────────────────────
+    if depth == 1:
+        structure = f"""## Executive Summary
+(Exactly 6 bullet points. Each bullet: one crisp sentence covering the single most important development. Most impactful first.)
+
+---
+
+{area_sections}
+
+---
+FORMATTING RULES:
+- Every item must follow: **[Source] [Date]:** followed by the summary.
+- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
+- Source: publication name from URL domain (techcrunch.com → TechCrunch). Never use raw URLs.
+- Each summary is 2–3 lines maximum. Be concise.
+- Number items within each section starting from 1.
+- Do not repeat the same news item in multiple sections."""
+
+    elif depth == 2:
+        structure = f"""## Executive Summary
+(Exactly 8 bullet points covering top developments across all domains. Most impactful first.)
+
+---
+
+{area_sections}
+
+---
+
+## Key Insights & Takeaways
+(6 numbered, actionable insights drawn from the findings above. What does this mean? What trends are emerging?)
+
+---
+FORMATTING RULES:
+- Every item must follow: **[Source] [Date]:** followed by the summary.
+- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
+- Source: publication name from URL domain. Never use raw URLs.
+- Each summary is 2–4 lines. No padding, no repetition.
+- Number items within each section starting from 1.
+- Do not repeat the same item in multiple sections."""
+
+    else:  # depth == 3
+        structure = f"""## Executive Summary
+(10 bullet points covering the most significant developments across all domains. Most impactful first.)
+
+---
+
+{area_sections}
+
+---
+
+## Key Insights & Takeaways
+(8 numbered, actionable insights. What does this mean strategically? What trends or patterns are emerging?)
+
+---
+
+## Watch List — Signals to Monitor
+(5 specific early signals or upcoming events to track closely over the next 1–2 weeks. Be concrete and actionable.)
+
+---
+FORMATTING RULES:
+- Every item must follow: **[Source] [Date]:** followed by the summary.
+- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
+- Source: publication name from URL domain. Never use raw URLs.
+- Each summary is 2–4 lines. No padding, no repetition.
+- Number items within each section starting from 1.
+- Do not repeat the same item in multiple sections."""
+
+    depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
+
+    prompt = f"""You are a senior analyst and researcher producing a {depth_label} intelligence brief.
 
 Today is {run_time.strftime('%B %d, %Y')}.
 All articles have been pre-filtered to only include news from the last {max_days} days.
@@ -483,24 +553,10 @@ Below are ONLY the new, unique findings gathered today (duplicates already remov
 
 Produce a professional intelligence brief in EXACTLY this structure:
 
-## Executive Summary
-(Maximum 10 lines. Cover the most significant developments across ALL domains combined. One crisp sentence per key development. Most important first.)
-
----
-
-{area_sections}
-
----
-FORMATTING RULES:
-- Every item must follow: **[Source] [Date]:** followed by the summary.
-- Date format: Mon DD, YYYY (e.g. Mar 27, 2026). Use the article's Date field exactly.
-- Source: extract the publication name from the URL (techcrunch.com → TechCrunch, arxiv.org → ArXiv). Never use the raw URL.
-- Each summary is 2–4 lines maximum. No padding, no repetition.
-- Number items within each section starting from 1.
-- Do not repeat the same news item in multiple sections.
+{structure}
 """
 
-    log.info("Synthesizing advisory report with Ollama...")
+    log.info(f"Synthesizing {depth_label} advisory report with Ollama...")
     return call_ollama(prompt)
 
 
@@ -520,10 +576,12 @@ def save_report(
     slug     = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")[:30]
     filename = f"research_brief_{slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
     filepath = reports_dir / filename
+    depth       = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
+    depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
     header = (
         f"# {title} Research Brief\n"
         f"**Date**: {run_time.strftime('%A, %B %d, %Y — %H:%M:%S')}\n"
-        f"**Model**: {OLLAMA_MODEL} | **Topics**: {len(topics)} domains | **Search range**: {time_range}\n"
+        f"**Model**: {OLLAMA_MODEL} | **Depth**: {depth_label} | **Topics**: {len(topics)} domains | **Search range**: {time_range}\n"
         f"**Articles gathered**: {total} | **Unique new**: {new} | **Duplicates removed**: {skipped}\n\n---\n\n"
     )
     filepath.write_text(header + content)
@@ -571,9 +629,11 @@ def run_research(expl_id: str | None = None) -> dict:
             filtered, new_count, skipped = filter_new_findings(findings_block, covered)
             log.info(f"  New: {new_count} | Duplicates removed: {skipped}")
 
-        log.info(f"[{eid}] Step 4/4: Synthesizing advisory report...")
-        _run_status[eid].update({"step": "4/4", "step_label": "Synthesizing intelligence brief with Ollama", "step_detail": f"{new_count} unique findings → generating report"})
-        body     = synthesize_advisory_report(filtered, run_time, total_articles, new_count, skipped, is_first_report, expl_cfg)
+        depth = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
+        depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
+        log.info(f"[{eid}] Step 4/4: Synthesizing {depth_label} advisory report...")
+        _run_status[eid].update({"step": "4/4", "step_label": f"Synthesizing {depth_label} brief with Ollama", "step_detail": f"{new_count} unique findings → generating report"})
+        body     = synthesize_advisory_report(filtered, run_time, total_articles, new_count, skipped, is_first_report, expl_cfg, depth)
         _run_status[eid].update({"step_label": "Saving report...", "step_detail": ""})
         filepath = save_report(body, run_time, total_articles, new_count, skipped, reports_dir, expl_cfg)
 
@@ -986,6 +1046,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </p>
         <div style="display:flex;flex-direction:column;gap:16px">
           <div>
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Scheduled Report Depth</label>
+            <select id="topicReportDepth" style="max-width:220px">
+              <option value="1">1-pager — compact summary (default)</option>
+              <option value="2">2-pager — summary + key insights</option>
+              <option value="3">3-pager — full detail + watch list</option>
+            </select>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Controls how detailed the scheduled research brief is. Deeper reports take longer to generate.</div>
+          </div>
+          <div>
             <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Time Range Filter</label>
             <input type="text" id="topicTimeRange" placeholder="e.g. past year, 2025 — leave blank for no filter" style="max-width:360px">
             <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Passed to SearXNG to filter search results by time.</div>
@@ -1193,7 +1262,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Full Research Run</div>
-            Searches all configured areas, fetches article content, deduplicates against previous reports, and synthesises a structured intelligence brief. Progress is shown step by step. Typical duration: <strong>4–10 minutes</strong>.
+            Searches all configured areas, fetches article content, deduplicates against previous reports, and synthesises a structured intelligence brief. Progress is shown step by step. Typical duration: <strong>4–10 minutes</strong>.<br><br>
+            <strong>Report depth</strong> is set per topic in <strong>⚙️ Settings → ⚙ Topic Settings → Scheduled Report Depth</strong>:<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:2px">
+              <li><strong>1-pager</strong> (default) — Executive summary + per-area findings. Fastest.</li>
+              <li><strong>2-pager</strong> — Adds Key Insights &amp; Takeaways section.</li>
+              <li><strong>3-pager</strong> — Full detail with Key Insights and a Watch List of signals to monitor.</li>
+            </ul>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Live Topic Research</div>
@@ -1800,6 +1875,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   async function loadTopicSettingsContent(){
     const d=await(await fetch('/api/topics/'+EXPL_ID+'/config')).json();
     const r=d.research||{};
+    document.getElementById('topicReportDepth').value=d.report_depth||1;
     document.getElementById('topicTimeRange').value=r.time_range||'';
     document.getElementById('topicMaxAge').value=r.max_age_months||3;
     document.getElementById('topicDedup').value=r.dedup_against_last_n_reports||2;
@@ -1813,6 +1889,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const msg=document.getElementById('topicSettingsMsg');
     msg.textContent='Saving…';msg.style.color='#6b7280';
     const body={
+      report_depth:parseInt(document.getElementById('topicReportDepth').value)||1,
       research:{
         time_range:document.getElementById('topicTimeRange').value.trim(),
         max_age_months:parseInt(document.getElementById('topicMaxAge').value)||3,
@@ -2473,6 +2550,7 @@ def api_topic_config_get(topic_id: str):
     return jsonify({
         "id":    topic_id,
         "title": expl_cfg.get("title", topic_id),
+        "report_depth":        expl_cfg.get("report_depth", 1),
         "discord_webhook":     expl_cfg.get("discord_webhook", ""),
         "discord_auto_notify": expl_cfg.get("discord_auto_notify", False),
         "research": {
@@ -2506,6 +2584,8 @@ def api_topic_config_save(topic_id: str):
             raw["research"]["dedup_against_last_n_reports"] = int(r["dedup_against_last_n_reports"])
         if "topics" in r:
             raw["research"]["topics"] = r["topics"]
+        if "report_depth" in body:
+            raw["report_depth"] = max(1, min(3, int(body["report_depth"])))
         if "discord_webhook" in body:
             raw["discord_webhook"] = body["discord_webhook"]
         if "discord_auto_notify" in body:
