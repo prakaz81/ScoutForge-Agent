@@ -1135,7 +1135,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div>
       <div class="card" style="height:fit-content">
         <div class="section-label">
-          Intelligence Reports ({{ reports|length }})
+          Generated Reports ({{ reports|length }})
           <span style="font-size:.65rem;color:#475569;font-weight:400;text-transform:none">newest first</span>
         </div>
         <ul class="report-list" id="reportList">
@@ -1540,7 +1540,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">⑤ Run your first research brief</div>
-            Click <strong>▶ Run Now</strong> (below the topic tabs). The run takes 4–10 minutes. A live progress card appears while running. When done, the report appears in the Intelligence Reports list on the right.
+            Click <strong>▶ Run Now</strong> (below the topic tabs). The run takes 4–10 minutes. A live progress card appears while running. When done, the report appears in the Generated Reports list on the right.
           </div>
 
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
@@ -1690,7 +1690,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Step 3 — Send a report manually</div>
-            On the Intelligence Reports list, click the <strong>🔔 icon</strong> next to any report to send it to Discord immediately.
+            On the Generated Reports list, click the <strong>🔔 icon</strong> next to any report to send it to Discord immediately.
           </div>
         </div>
       </div>
