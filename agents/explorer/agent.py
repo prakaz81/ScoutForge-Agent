@@ -19,6 +19,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from threading import Thread
 
+import markdown as md_lib
 import trafilatura
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -443,6 +444,7 @@ def synthesize_advisory_report(
     is_first_report: bool,
     expl_cfg: dict,
     depth: int = 1,
+    style: str = "summary",
 ) -> str:
 
     if "NO_NEW_FINDINGS" in filtered_findings or new_count == 0:
@@ -538,8 +540,88 @@ FORMATTING RULES:
 - Do not repeat the same item in multiple sections."""
 
     depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
+    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}[style]
 
-    prompt = f"""You are a senior analyst and researcher producing a {depth_label} intelligence brief.
+    # ── Style-specific prompts ────────────────────────────────────────
+    if style == "qa":
+        qa_count = {1: 6, 2: 10, 3: 14}[depth]
+        prompt = f"""You are a senior analyst producing a {depth_label} Q&A intelligence brief.
+
+Today is {run_time.strftime('%B %d, %Y')}.
+All articles are from the last {max_days} days.
+{dedup_note}
+
+FINDINGS:
+{filtered_findings}
+
+---
+
+Produce exactly {qa_count} Q&A pairs covering the most important developments. Structure:
+
+## Q&A Intelligence Brief
+
+For each pair use EXACTLY this format:
+
+### Q{'{n}'}: [Sharp, specific question a decision-maker would ask]
+**A:** [Thorough, factual answer citing sources and dates. 3–6 sentences. Include: what happened, who is involved, why it matters, what to watch next.]
+**Source:** [Publication] | **Date:** [Mon DD, YYYY]
+
+---
+
+Rules:
+- Questions must be specific and insightful — not generic ("What happened in AI?")
+- Answers must be factual and grounded in the findings provided
+- Cover diverse areas — do not cluster all questions on one domain
+- Most important developments first
+- Do not invent information not present in the findings
+"""
+
+    elif style == "blog":
+        section_count = {1: 3, 2: 5, 3: 7}[depth]
+        prompt = f"""You are a senior technology journalist writing a {depth_label} blog post.
+
+Today is {run_time.strftime('%B %d, %Y')}.
+All developments are from the last {max_days} days.
+{dedup_note}
+
+RESEARCH FINDINGS:
+{filtered_findings}
+
+---
+
+Write an engaging, well-structured blog post covering the key developments. Structure:
+
+## [Compelling blog post title reflecting the biggest story this period]
+
+*Published {run_time.strftime('%B %d, %Y')} · ScoutForge Intelligence*
+
+---
+
+### Introduction
+[2–3 paragraphs setting the scene. What is the big picture this period? Why does it matter? Hook the reader.]
+
+[Write {section_count} body sections. Each section:
+### [Section heading — specific topic or theme]
+[2–4 flowing paragraphs. Cite sources naturally inline: "According to TechCrunch (Mar 28)..." or "Research published by Anthropic shows...". Tell the story, explain implications, connect dots between findings.]
+]
+
+### What to Watch
+[Final section: 3–5 specific developments to monitor. Paragraph form, not bullets.]
+
+---
+
+*Sources from this report: based on {new_count} unique findings gathered by ScoutForge.*
+
+Rules:
+- Write in flowing prose — NOT bullet points
+- Cite sources and dates naturally inline
+- Connect findings into coherent narratives across sections
+- Be analytical, not just descriptive — explain why things matter
+- Appropriate for a professional technology/industry audience
+"""
+
+    else:  # summary (default)
+        prompt = f"""You are a senior analyst and researcher producing a {depth_label} intelligence brief.
 
 Today is {run_time.strftime('%B %d, %Y')}.
 All articles have been pre-filtered to only include news from the last {max_days} days.
@@ -556,7 +638,7 @@ Produce a professional intelligence brief in EXACTLY this structure:
 {structure}
 """
 
-    log.info(f"Synthesizing {depth_label} advisory report with Ollama...")
+    log.info(f"Synthesizing {depth_label} {style_label} report with Ollama...")
     return call_ollama(prompt)
 
 
@@ -577,11 +659,13 @@ def save_report(
     filename = f"research_brief_{slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
     filepath = reports_dir / filename
     depth       = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
+    style       = expl_cfg.get("report_style", "summary")
     depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
+    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}.get(style, "Quick Summary")
     header = (
         f"# {title} Research Brief\n"
         f"**Date**: {run_time.strftime('%A, %B %d, %Y — %H:%M:%S')}\n"
-        f"**Model**: {OLLAMA_MODEL} | **Depth**: {depth_label} | **Topics**: {len(topics)} domains | **Search range**: {time_range}\n"
+        f"**Model**: {OLLAMA_MODEL} | **Style**: {style_label} | **Depth**: {depth_label} | **Topics**: {len(topics)} domains | **Search range**: {time_range}\n"
         f"**Articles gathered**: {total} | **Unique new**: {new} | **Duplicates removed**: {skipped}\n\n---\n\n"
     )
     filepath.write_text(header + content)
@@ -630,10 +714,12 @@ def run_research(expl_id: str | None = None) -> dict:
             log.info(f"  New: {new_count} | Duplicates removed: {skipped}")
 
         depth = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
+        style = expl_cfg.get("report_style", "summary")
         depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
-        log.info(f"[{eid}] Step 4/4: Synthesizing {depth_label} advisory report...")
-        _run_status[eid].update({"step": "4/4", "step_label": f"Synthesizing {depth_label} brief with Ollama", "step_detail": f"{new_count} unique findings → generating report"})
-        body     = synthesize_advisory_report(filtered, run_time, total_articles, new_count, skipped, is_first_report, expl_cfg, depth)
+        style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}.get(style, "Quick Summary")
+        log.info(f"[{eid}] Step 4/4: Synthesizing {depth_label} {style_label} report...")
+        _run_status[eid].update({"step": "4/4", "step_label": f"Synthesising {style_label} ({depth_label}) with Ollama", "step_detail": f"{new_count} unique findings → generating report"})
+        body     = synthesize_advisory_report(filtered, run_time, total_articles, new_count, skipped, is_first_report, expl_cfg, depth, style)
         _run_status[eid].update({"step_label": "Saving report...", "step_detail": ""})
         filepath = save_report(body, run_time, total_articles, new_count, skipped, reports_dir, expl_cfg)
 
@@ -792,6 +878,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
     <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
     <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openModal('helpModal')">❓ Help</button>
+    <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openModal('creditsModal')">★ Credits</button>
   </div>
 
   <!-- Header -->
@@ -1055,6 +1142,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Controls how detailed the scheduled research brief is. Deeper reports take longer to generate.</div>
           </div>
           <div>
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Report Style</label>
+            <select id="topicReportStyle" style="max-width:220px">
+              <option value="summary">Quick Summary (default)</option>
+              <option value="qa">Q&amp;A</option>
+              <option value="blog">Blog Post</option>
+            </select>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">
+              <strong>Quick Summary</strong> — structured bullet-point intelligence brief.<br>
+              <strong>Q&amp;A</strong> — LLM generates key questions and answers from findings.<br>
+              <strong>Blog Post</strong> — flowing narrative post, readable as an article.
+            </div>
+          </div>
+          <div>
             <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Time Range Filter</label>
             <input type="text" id="topicTimeRange" placeholder="e.g. past year, 2025 — leave blank for no filter" style="max-width:360px">
             <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Passed to SearXNG to filter search results by time.</div>
@@ -1149,6 +1249,54 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="footGuardrails" style="display:none">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Close</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Credits Modal ────────────────────────────────────────────── -->
+<div class="overlay" id="creditsModal">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <h3>★ Credits &amp; Open Source Stack</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('creditsModal')">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:20px 0 16px">
+        <div style="font-size:2rem;margin-bottom:8px">🔭</div>
+        <div style="font-size:1.2rem;font-weight:800;color:#111827">ScoutForge</div>
+        <div style="font-size:.82rem;color:#6b7280;margin-top:4px">Agentic curated topic research &amp; intelligence synthesis</div>
+        <div style="margin-top:16px;font-size:.88rem;color:#374151">
+          Developed by <strong style="color:#111827">Prakash Narayanamoorthy</strong>
+        </div>
+        <div style="margin-top:4px;font-size:.78rem;color:#9ca3af">Local AI · No cloud · No subscriptions</div>
+      </div>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:4px 0 20px">
+      <div style="font-size:.78rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Open Source Components</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        {% set stack = [
+          ('🦙 Ollama', 'Local LLM inference engine', 'ollama.com', 'MIT'),
+          ('🔍 SearXNG', 'Self-hosted privacy-respecting meta-search engine', 'searxng.github.io/searxng', 'AGPL-3.0'),
+          ('🐍 Python 3.12', 'Core runtime', 'python.org', 'PSF'),
+          ('🌶 Flask', 'Web framework & REST API', 'flask.palletsprojects.com', 'BSD-3-Clause'),
+          ('⏰ APScheduler', 'Background job scheduling', 'apscheduler.readthedocs.io', 'MIT'),
+          ('📰 Trafilatura', 'Web page content extraction', 'trafilatura.readthedocs.io', 'Apache-2.0'),
+          ('📝 Python-Markdown', 'Markdown to HTML rendering', 'python-markdown.github.io', 'BSD-3-Clause'),
+          ('⚙️ PyYAML', 'YAML config parsing', 'pyyaml.org', 'MIT'),
+          ('🐋 Docker', 'Container orchestration', 'docker.com', 'Apache-2.0'),
+        ] %}
+        {% for name, desc, url, lic in stack %}
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px">
+          <div style="flex:1">
+            <div style="font-weight:600;color:#111827;font-size:.88rem">{{ name }}</div>
+            <div style="font-size:.75rem;color:#6b7280;margin-top:2px">{{ desc }}</div>
+          </div>
+          <span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:12px;padding:2px 8px;font-size:.68rem;font-weight:600;white-space:nowrap">{{ lic }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('creditsModal')">Close</button>
     </div>
   </div>
 </div>
@@ -1876,6 +2024,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const d=await(await fetch('/api/topics/'+EXPL_ID+'/config')).json();
     const r=d.research||{};
     document.getElementById('topicReportDepth').value=d.report_depth||1;
+    document.getElementById('topicReportStyle').value=d.report_style||'summary';
     document.getElementById('topicTimeRange').value=r.time_range||'';
     document.getElementById('topicMaxAge').value=r.max_age_months||3;
     document.getElementById('topicDedup').value=r.dedup_against_last_n_reports||2;
@@ -1890,6 +2039,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     msg.textContent='Saving…';msg.style.color='#6b7280';
     const body={
       report_depth:parseInt(document.getElementById('topicReportDepth').value)||1,
+      report_style:document.getElementById('topicReportStyle').value||'summary',
       research:{
         time_range:document.getElementById('topicTimeRange').value.trim(),
         max_age_months:parseInt(document.getElementById('topicMaxAge').value)||3,
@@ -2186,12 +2336,139 @@ def api_reports():
     return jsonify({"count": len(reports), "reports": reports, "expl_id": expl_id})
 
 
+@app.route("/reports/<expl_id>/<filename>/raw")
+def view_report_raw(expl_id: str, filename: str):
+    filepath = _reports_dir(expl_id) / filename
+    if not filepath.exists() or filepath.suffix != ".md":
+        return "Report not found", 404
+    return filepath.read_text(), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @app.route("/reports/<expl_id>/<filename>")
 def view_report(expl_id: str, filename: str):
     filepath = _reports_dir(expl_id) / filename
     if not filepath.exists() or filepath.suffix != ".md":
         return "Report not found", 404
-    return filepath.read_text(), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+    raw      = filepath.read_text()
+    expl_cfg = EXPLORATIONS.get(expl_id) or {}
+    style    = expl_cfg.get("report_style", "summary")
+
+    # Detect style from report header if config not available
+    if "**Style**: Q&A" in raw:
+        style = "qa"
+    elif "**Style**: Blog Post" in raw:
+        style = "blog"
+
+    # Convert markdown → HTML
+    body_html = md_lib.markdown(raw, extensions=["tables", "fenced_code", "nl2br"])
+
+    # Style-specific CSS tweaks
+    if style == "qa":
+        style_css = """
+        h3{background:#eff6ff;border-left:4px solid #2563eb;padding:10px 16px;border-radius:0 8px 8px 0;color:#1e40af;margin-top:28px}
+        strong:first-child{color:#059669}
+        """
+        style_badge = '<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700">Q&amp;A</span>'
+    elif style == "blog":
+        style_css = """
+        .report-body{max-width:720px;margin:0 auto;font-size:1.05rem;line-height:1.85}
+        h2{font-size:1.7rem;font-weight:800;color:#111827;margin-top:40px;margin-bottom:8px}
+        h3{font-size:1.2rem;font-weight:700;color:#1d4ed8;margin-top:32px;border-bottom:2px solid #e5e7eb;padding-bottom:6px}
+        p{margin-bottom:18px;color:#374151}
+        em{color:#6b7280;font-size:.92rem}
+        """
+        style_badge = '<span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700">Blog Post</span>'
+    else:
+        style_css = """
+        h2{color:#111827;border-bottom:2px solid #e5e7eb;padding-bottom:8px;margin-top:32px}
+        h3{color:#1d4ed8;margin-top:24px}
+        li{margin-bottom:6px}
+        """
+        style_badge = '<span style="background:#faf5ff;color:#7c3aed;border:1px solid #ddd6fe;border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700">Quick Summary</span>'
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{filename}</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:system-ui,-apple-system,sans-serif;background:#f5f7fa;color:#111827;min-height:100vh}}
+    .page{{max-width:900px;margin:0 auto;padding:32px 24px}}
+
+    /* Top bar */
+    .topbar{{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px}}
+    .topbar-left{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
+    .back-btn{{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#fff;border:1px solid #d1d5db;border-radius:8px;font-size:.82rem;font-weight:600;color:#374151;text-decoration:none;cursor:pointer}}
+    .back-btn:hover{{background:#f3f4f6}}
+    .action-btn{{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#fff;border:1px solid #d1d5db;border-radius:8px;font-size:.82rem;font-weight:600;color:#374151;cursor:pointer;text-decoration:none}}
+    .action-btn:hover{{background:#f3f4f6}}
+    .action-btn.primary{{background:#2563eb;color:#fff;border-color:#2563eb}}
+    .action-btn.primary:hover{{background:#1d4ed8}}
+
+    /* Report card */
+    .report-card{{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:32px 36px;box-shadow:0 2px 8px rgba(0,0,0,.06)}}
+    .report-meta{{font-size:.78rem;color:#9ca3af;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #f3f4f6;font-family:monospace;line-height:1.7}}
+    .report-body{{}}
+    .report-body h1{{font-size:1.5rem;font-weight:800;color:#111827;margin-bottom:16px;line-height:1.3}}
+    .report-body h2{{font-size:1.15rem;font-weight:700;color:#111827;border-bottom:2px solid #e5e7eb;padding-bottom:8px;margin-top:32px;margin-bottom:14px}}
+    .report-body h3{{font-size:1rem;font-weight:700;color:#1d4ed8;margin-top:22px;margin-bottom:8px}}
+    .report-body p{{margin-bottom:14px;line-height:1.75;color:#374151}}
+    .report-body ul,.report-body ol{{padding-left:22px;margin-bottom:14px}}
+    .report-body li{{margin-bottom:8px;line-height:1.7;color:#374151}}
+    .report-body strong{{color:#111827}}
+    .report-body em{{color:#6b7280}}
+    .report-body hr{{border:none;border-top:1px solid #e5e7eb;margin:24px 0}}
+    .report-body code{{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px;font-size:.85rem}}
+    .report-body blockquote{{border-left:4px solid #2563eb;padding:10px 16px;background:#eff6ff;border-radius:0 8px 8px 0;margin:16px 0;color:#1e40af}}
+    .report-body table{{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.88rem}}
+    .report-body th{{background:#f9fafb;border:1px solid #e5e7eb;padding:8px 12px;text-align:left;font-weight:600}}
+    .report-body td{{border:1px solid #e5e7eb;padding:8px 12px}}
+    {style_css}
+
+    /* Footer */
+    .report-footer{{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:.72rem;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}}
+
+    /* Print */
+    @media print{{
+      body{{background:#fff}}
+      .topbar{{display:none}}
+      .report-card{{border:none;box-shadow:none;padding:0}}
+      .report-footer{{display:none}}
+    }}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/?expl={expl_id}" class="back-btn">← Back to Dashboard</a>
+      {style_badge}
+      <span style="font-size:.78rem;color:#9ca3af;font-family:monospace">{filename}</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="action-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+      <a href="/reports/{expl_id}/{filename}/raw" class="action-btn" target="_blank">📄 Raw Markdown</a>
+    </div>
+  </div>
+
+  <div class="report-card">
+    <div class="report-body">
+      {body_html}
+    </div>
+    <div class="report-footer">
+      <span>ScoutForge · {expl_cfg.get("title", expl_id)}</span>
+      <span>{filename}</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>"""
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 @app.route("/api/skill", methods=["GET"])
@@ -2551,6 +2828,7 @@ def api_topic_config_get(topic_id: str):
         "id":    topic_id,
         "title": expl_cfg.get("title", topic_id),
         "report_depth":        expl_cfg.get("report_depth", 1),
+        "report_style":        expl_cfg.get("report_style", "summary"),
         "discord_webhook":     expl_cfg.get("discord_webhook", ""),
         "discord_auto_notify": expl_cfg.get("discord_auto_notify", False),
         "research": {
@@ -2586,6 +2864,8 @@ def api_topic_config_save(topic_id: str):
             raw["research"]["topics"] = r["topics"]
         if "report_depth" in body:
             raw["report_depth"] = max(1, min(3, int(body["report_depth"])))
+        if "report_style" in body and body["report_style"] in ("summary", "qa", "blog"):
+            raw["report_style"] = body["report_style"]
         if "discord_webhook" in body:
             raw["discord_webhook"] = body["discord_webhook"]
         if "discord_auto_notify" in body:
@@ -2638,13 +2918,50 @@ def _send_discord(webhook_url: str, content: str) -> dict:
 def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
     """Build a Discord-friendly summary from a report file."""
     title  = expl_cfg.get("title", expl_cfg.get("id", "ScoutForge"))
+    style  = expl_cfg.get("report_style", "summary")
     text   = report_path.read_text()
     lines  = text.splitlines()
-    # Extract executive summary / What's New section (first 30 lines after the header)
-    body_lines = [l for l in lines if not l.startswith("**") or "Date" not in l]
-    summary = "\n".join(body_lines[:60]).strip()
-    header  = f"**📡 ScoutForge — {title}**\n**Report:** `{report_path.name}`\n\n"
-    return header + summary[:1800]
+
+    # Detect style from header if config not set
+    if "**Style**: Q&A" in text:
+        style = "qa"
+    elif "**Style**: Blog Post" in text:
+        style = "blog"
+
+    style_icon = {"summary": "📋", "qa": "❓", "blog": "📝"}.get(style, "📋")
+    style_name = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}.get(style, "Quick Summary")
+
+    header = f"**📡 ScoutForge — {title}** · {style_icon} {style_name}\n**Report:** `{report_path.name}`\n\n"
+
+    if style == "qa":
+        # Extract first 3 Q&A pairs
+        pairs, current = [], []
+        for line in lines:
+            if line.startswith("### Q") and current:
+                pairs.append("\n".join(current)); current = []
+            current.append(line)
+        if current:
+            pairs.append("\n".join(current))
+        excerpt = "\n\n".join(pairs[:3])
+    elif style == "blog":
+        # Extract intro paragraphs (skip metadata lines)
+        body = [l for l in lines if l and not l.startswith("**") and not l.startswith("#")]
+        excerpt = "\n".join(body[:12])
+    else:
+        # Extract executive summary bullets
+        in_exec = False
+        bullets = []
+        for line in lines:
+            if "Executive Summary" in line:
+                in_exec = True; continue
+            if in_exec:
+                if line.startswith("---") or (line.startswith("##") and "Executive" not in line):
+                    break
+                if line.strip():
+                    bullets.append(line)
+        excerpt = "\n".join(bullets[:10])
+
+    return (header + excerpt)[:1900]
 
 
 @app.route("/api/reports/<expl_id>/<filename>/discord", methods=["POST"])
