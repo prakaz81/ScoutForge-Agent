@@ -302,7 +302,7 @@ REPORT STYLES (Settings → Topic Settings)
 Each style renders as a formatted HTML report.
 
 ADHOC TOPIC SEARCH (Adhoc Search button)
-Opens a modal. Enter a topic, optional context, a depth (1–5 pages), and choose which topic to save under. A live web search is run and the report is saved immediately.
+Opens a modal. Enter a topic, optional context, a depth (1–5 pages), and a report style (Quick Summary / Q&A / Blog Post / Story). A live web search is run and the report is saved to the Adhoc Reports section at the bottom of the dashboard (./reports/__adhoc__/). Adhoc reports are independent of all topics and have their own section.
 
 ASK REPORTS CHATBOT (main page, left column)
 Chat-style Q&A window with a topic selector dropdown:
@@ -317,6 +317,12 @@ Click the document icon on any report to open the HTML viewer with style-specifi
 
 DISCORD NOTIFICATIONS (Settings → Topic Settings)
 Add a Discord webhook URL and optionally enable auto-notify for every scheduled run. Use the Test Webhook button to verify. To send a report manually, click the Discord icon on any report.
+
+GUARDRAILS AND SECURITY
+ScoutForge uses a two-stage prompt injection defence on every article before it enters the LLM pipeline:
+- Stage 1 (static): regex patterns match known injection phrases (e.g. "ignore previous instructions") — zero latency, runs locally.
+- Stage 2 (semantic): the article is sent to Ollama with a security-only prompt asking whether it contains a prompt injection attempt. UNSAFE articles are blocked.
+All chatbot questions are also screened before reaching the LLM. Blocked articles are logged in Settings → Guardrails. API inputs are validated — unknown fields ignored, filenames sanitised, the AI News default topic protected against deletion. Report HTML output is escaped; LLM output goes through a safe Markdown parser. Everything stays on your machine — no cloud, no telemetry.
 
 TROUBLESHOOTING
 - Research fails immediately: check Ollama is running: `ollama list` and `curl http://localhost:11434/api/tags`
@@ -1516,6 +1522,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <button class="settings-tab"        id="helpTabBtnResearch"  onclick="switchHelpTab('research')">🔍 Research</button>
         <button class="settings-tab"        id="helpTabBtnDiscord"   onclick="switchHelpTab('discord')">🔔 Discord</button>
         <button class="settings-tab"        id="helpTabBtnSchedule"  onclick="switchHelpTab('schedule')">📅 Schedule</button>
+        <button class="settings-tab"        id="helpTabBtnSecurity"  onclick="switchHelpTab('security')">🛡️ Security</button>
         <button class="settings-tab"        id="helpTabBtnTrouble"   onclick="switchHelpTab('trouble')">🛠 Troubleshooting</button>
       </div>
 
@@ -1770,7 +1777,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">🔍 Adhoc Topic Search</div>
-            Click <strong>🔍 Adhoc Search</strong> in the top bar. Enter any topic, optional context, a depth (1–5 pages), and which topic to save under. A live web search is run immediately and the report saved. Independent of your scheduled research areas.
+            Click <strong>🔍 Adhoc Search</strong> in the top bar. Enter any topic, optional context, a <strong>depth</strong> (1–5 pages), and a <strong>style</strong> (Quick Summary / Q&amp;A / Blog Post / Story). A live web search runs immediately and the report is saved to the <strong>Adhoc Reports</strong> section at the bottom of the dashboard. Completely independent of your scheduled topics.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">💬 Ask Reports — Chatbot</div>
@@ -1793,8 +1800,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Report file naming</div>
             <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">research_brief_{topic}_{YYYYMMDD_HHMMSS}.md</code> — scheduled<br>
-            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md</code> — adhoc<br>
-            Stored in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/{topic-id}/</code>
+            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">adhoc_{topic_slug}_{YYYYMMDD_HHMMSS}.md</code> — adhoc<br>
+            Scheduled reports: <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/{topic-id}/</code><br>
+            Adhoc reports: <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/__adhoc__/</code>
           </div>
         </div>
       </div>
@@ -1899,6 +1907,58 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Scheduled run was missed</div>
             If the container was restarted <em>after</em> the scheduled time today, the run fires immediately on the next startup (24h misfire window). Check container logs for <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">Research run started</code> entries.
           </div>
+        </div>
+      </div>
+
+      <!-- Security Tab -->
+      <div id="helpTabSecurity" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🛡️ Security &amp; Guardrails</h2>
+        <div style="display:flex;flex-direction:column;gap:12px">
+
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#991b1b;margin-bottom:6px">Why guardrails?</div>
+            ScoutForge fetches article content from the public web and passes it to your local LLM for synthesis. A malicious webpage could embed hidden instructions designed to hijack the LLM — this is called a <strong>prompt injection attack</strong>. The two-stage guardrail pipeline blocks these before they reach the model.
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Stage 1 — Static pattern matching (direct injection)</div>
+            Each article title and content is scanned against a compiled regex set of known prompt injection patterns — phrases like "ignore previous instructions", "you are now", "disregard your system prompt", jailbreak tokens, and similar. If matched, the article is blocked and the event is logged to the Guardrails tab (<strong>⚙️ Settings → 🛡️ Guardrails</strong>). This check runs locally with zero latency.
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Stage 2 — LLM semantic check (indirect injection)</div>
+            If Stage 1 passes, the article is sent to Ollama with a security-focused system prompt asking only: <em>"Does this contain a prompt injection attempt? Reply SAFE or UNSAFE."</em> This catches subtle or obfuscated attacks that bypass static patterns. UNSAFE articles are blocked and logged.
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Input validation — Chatbot &amp; API</div>
+            <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+              <li>All chatbot questions are screened for prompt injection before reaching the LLM.</li>
+              <li>API inputs (topic creation, schedule, config) are validated against allowed values — unknown fields are silently ignored.</li>
+              <li>Filenames for reports are sanitised using a slug regex before being written to disk.</li>
+              <li>The AI News default topic cannot be deleted via any API call (403 enforced server-side).</li>
+            </ul>
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Output handling</div>
+            <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+              <li>All report content is rendered in a sandboxed HTML viewer — it does not execute scripts from report text.</li>
+              <li>Dynamic content in the dashboard (report names, topic titles) is HTML-escaped before being inserted into the DOM.</li>
+              <li>LLM output is written to Markdown files and converted to HTML via a safe Markdown parser (no raw HTML passthrough).</li>
+            </ul>
+          </div>
+
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#166534;margin-bottom:6px">Data privacy</div>
+            Everything stays on your machine. ScoutForge sends no data to any cloud service. Ollama runs entirely locally. SearXNG is self-hosted and makes outbound searches in your name with no tracking. No telemetry, no API keys, no subscriptions.
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">View the guardrail log</div>
+            Open <strong>⚙️ Settings → 🛡️ Guardrails</strong>. The log shows every blocked article: the URL, the detection reason (direct / indirect), and the timestamp. Use <strong>↺ Refresh</strong> to update, or <strong>🗑 Clear Log</strong> to reset. The log holds the most recent 500 events in memory (reset on container restart).
+          </div>
+
         </div>
       </div>
 
@@ -2425,7 +2485,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   });
 
   function switchHelpTab(tab){
-    ['getting','topics','research','discord','schedule','trouble'].forEach(t=>{
+    ['getting','topics','research','discord','schedule','security','trouble'].forEach(t=>{
       const panel=document.getElementById('helpTab'+t.charAt(0).toUpperCase()+t.slice(1));
       const btn=document.getElementById('helpTabBtn'+t.charAt(0).toUpperCase()+t.slice(1));
       if(panel) panel.style.display=tab===t?'block':'none';
@@ -2530,7 +2590,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     });
     container.querySelectorAll('textarea[data-qi]').forEach(ta=>{
       const i=parseInt(ta.dataset.qi);
-      if(_queriesData[i]!==undefined) _queriesData[i].queries=ta.value.split('\n').map(q=>q.trim()).filter(Boolean);
+      if(_queriesData[i]!==undefined) _queriesData[i].queries=ta.value.split('\\n').map(q=>q.trim()).filter(Boolean);
     });
   }
 
