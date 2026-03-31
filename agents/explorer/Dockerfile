@@ -11,6 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY agent.py .
+COPY guardrails.py .
 COPY config.yaml .
 
 # Reports written to /reports (mounted volume)
