@@ -731,6 +731,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       {% endfor %}
     </div>
     <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
+    <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.85rem;font-weight:600" onclick="openModal('helpModal')">❓ Help</button>
   </div>
 
   <!-- Header -->
@@ -1079,6 +1080,250 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="footGuardrails" style="display:none">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Close</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Help Modal ───────────────────────────────────────────────── -->
+<div class="overlay" id="helpModal">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-head">
+      <h3>❓ Agent ScoutForge — Setup &amp; User Guide</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('helpModal')">✕ Close</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+
+      <!-- Help tab bar -->
+      <div style="display:flex;border-bottom:1px solid #e5e7eb;background:#f9fafb;flex-wrap:wrap">
+        <button class="settings-tab active" id="helpTabBtnGetting"   onclick="switchHelpTab('getting')">🚀 Getting Started</button>
+        <button class="settings-tab"        id="helpTabBtnTopics"    onclick="switchHelpTab('topics')">📂 Topics</button>
+        <button class="settings-tab"        id="helpTabBtnResearch"  onclick="switchHelpTab('research')">🔍 Research</button>
+        <button class="settings-tab"        id="helpTabBtnDiscord"   onclick="switchHelpTab('discord')">🔔 Discord</button>
+        <button class="settings-tab"        id="helpTabBtnSchedule"  onclick="switchHelpTab('schedule')">📅 Schedule</button>
+        <button class="settings-tab"        id="helpTabBtnTrouble"   onclick="switchHelpTab('trouble')">🛠 Troubleshooting</button>
+      </div>
+
+      <!-- Getting Started -->
+      <div id="helpTabGetting" style="padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🚀 Getting Started</h2>
+
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:20px">
+          <strong style="color:#1d4ed8">What is Agent ScoutForge?</strong><br>
+          A self-hosted research agent that automatically monitors any topic you define, searches the web across multiple query angles, deduplicates findings against past reports, and synthesises intelligence briefs using a local LLM — all running on your machine with no cloud dependencies.
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">① Prerequisites</div>
+            <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+              <li><strong>Docker Desktop</strong> — must be running on your Mac</li>
+              <li><strong>Ollama</strong> — installed and running on the Mac host (<code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">brew install ollama</code> or <a href="https://ollama.com" target="_blank" style="color:#2563eb">ollama.com</a>)</li>
+              <li><strong>A model pulled in Ollama</strong> — default is <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">llama3.1:8b</code><br>
+                Pull it: <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">ollama pull llama3.1:8b</code></li>
+            </ul>
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">② Start the stack</div>
+            <code style="background:#111827;color:#e5e7eb;border-radius:8px;padding:10px 14px;display:block;font-size:.82rem">cd ScoutForge<br>./run.sh setup    # first time only — builds images &amp; starts containers<br>./run.sh start    # subsequent starts</code>
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">③ Create your first topic</div>
+            Click <strong>⊕ Topic Mgmt</strong> in the nav bar → enter a name → <strong>Create</strong>.<br>
+            The new topic tab appears immediately. Click it to open it.
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">④ Configure your topic</div>
+            Open <strong>⚙️ Settings</strong> on the topic page:<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
+              <li><strong>📋 Skills</strong> — describe what this topic monitors (shown as a banner on the page)</li>
+              <li><strong>🔍 Research Queries</strong> — add research areas and their search queries</li>
+              <li><strong>⚙ Topic Settings</strong> — set time range, article age filter, and Discord webhook</li>
+              <li><strong>📅 Schedule</strong> (main page) — set how often to run automatically</li>
+            </ul>
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">⑤ Run your first research brief</div>
+            Click <strong>▶ Run Full Research Now</strong>. The run takes 4–10 minutes depending on the number of queries and your Ollama model. Progress is shown live. When done, the report appears in the Intelligence Reports list.
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Topics -->
+      <div id="helpTabTopics" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">📂 Managing Topics</h2>
+
+        <p style="margin-bottom:14px">Each topic is a fully independent research stream with its own schedule, research queries, reports, and Discord webhook.</p>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Creating a topic</div>
+            Click <strong>⊕ Topic Mgmt</strong> → enter a display name → <strong>Create</strong>. ScoutForge creates the config and skills files automatically. The topic is immediately available — no restart needed.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">⚠️ Amber dot indicator</div>
+            A topic tab shows an <span style="color:#f59e0b;font-weight:700">●</span> dot when its <strong>Skills</strong> description is empty. Go to ⚙️ Settings → Skills to fill it in and clear the indicator.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Deleting a topic</div>
+            Open <strong>⊕ Topic Mgmt</strong> → click <strong>Delete</strong> next to the topic. This permanently removes the topic config <em>and all its reports</em>. Cannot be undone.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Settings — Skills tab</div>
+            A plain-English description of what this topic monitors. The first paragraph is shown as the yellow info banner on the topic's dashboard page. Supports multiple paragraphs and bullet points.
+          </div>
+        </div>
+      </div>
+
+      <!-- Research -->
+      <div id="helpTabResearch" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🔍 Research Queries &amp; Reports</h2>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Research Areas &amp; Queries</div>
+            Go to <strong>⚙️ Settings → 🔍 Research Queries</strong>.<br>
+            Each <strong>area</strong> is a named domain (e.g. "AI Security Incidents"). Each area has a list of <strong>search queries</strong> — one per line — that ScoutForge sends to SearXNG.<br>
+            <span style="color:#6b7280;font-size:.82rem">Tip: 6–10 specific queries per area gives the best coverage. Avoid overly broad terms.</span>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Full Research Run</div>
+            Searches all configured areas, fetches article content, deduplicates against previous reports, and synthesises a structured intelligence brief. Progress is shown step by step. Typical duration: <strong>4–10 minutes</strong>.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Live Topic Research</div>
+            One-off deep-dive on any subject. Enter a topic (e.g. "MCP security risks"), optionally add context, choose a depth (1–5 pages), and click <strong>🔍 Research This Topic</strong>. Result is saved as a report immediately.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Ask All Reports (RAG)</div>
+            Ask any question — ScoutForge searches across the last 5 reports and synthesises an answer using the LLM. Example: <em>"What CVEs were disclosed this week?"</em>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Per-Report Chat (💬)</div>
+            Click the 💬 icon on any report to open a focused chat window. Questions are answered using only that report's content — great for drilling into a specific brief.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Report file naming</div>
+            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">research_brief_{topic}_{YYYYMMDD_HHMMSS}.md</code> — scheduled run<br>
+            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md</code> — live topic research<br>
+            Reports are stored in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/{topic-id}/</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Discord -->
+      <div id="helpTabDiscord" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🔔 Discord Notifications</h2>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px">
+            <strong style="color:#1d4ed8">How it works</strong><br>
+            ScoutForge sends a formatted summary of each report to a Discord channel via a webhook. You can send manually (🔔 button on any report) or enable auto-notify to receive every scheduled run automatically.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:8px">Step 1 — Get a Discord webhook URL</div>
+            <ol style="list-style:decimal;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+              <li>Open Discord and go to the channel you want reports sent to</li>
+              <li>Click the ⚙️ gear icon next to the channel name → <strong>Edit Channel</strong></li>
+              <li>Go to <strong>Integrations → Webhooks → New Webhook</strong></li>
+              <li>Give it a name (e.g. <em>ScoutForge</em>), click <strong>Copy Webhook URL</strong></li>
+            </ol>
+            <div style="margin-top:8px;font-size:.8rem;color:#6b7280">
+              💡 To receive reports as a DM: create a private server with only yourself, add a webhook to a channel there, and use that URL.
+            </div>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Step 2 — Configure in ScoutForge</div>
+            Go to <strong>⚙️ Settings → ⚙ Topic Settings</strong> → scroll to the <strong>Discord Notifications</strong> section:<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
+              <li>Paste the webhook URL</li>
+              <li>Click <strong>🔔 Test Webhook</strong> to verify it works</li>
+              <li>Check <strong>Auto-notify on every scheduled run</strong> if you want automatic delivery</li>
+              <li>Click <strong>💾 Save Settings</strong></li>
+            </ul>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Step 3 — Send a report manually</div>
+            On the Intelligence Reports list, click the <strong>🔔 icon</strong> next to any report to send it to Discord immediately.
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div id="helpTabSchedule" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">📅 Schedule</h2>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Setting the schedule</div>
+            The <strong>Schedule</strong> card on the main topic page lets you set:<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
+              <li><strong>Frequency</strong> — Daily, Weekly, or Monthly</li>
+              <li><strong>Time</strong> — hour and minute (24h format)</li>
+              <li><strong>Day of week</strong> (weekly) or <strong>Day of month</strong> (monthly)</li>
+            </ul>
+            Click <strong>💾 Save</strong> — takes effect immediately, no restart needed.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Missed runs &amp; container restarts</div>
+            ScoutForge uses a <strong>24-hour misfire window</strong>. If the container was restarted after a scheduled time, the missed run fires immediately on startup — you won't silently lose a day's research.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">Timezone</div>
+            The schedule timezone is set in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">explorations/{id}/config.yaml</code> under <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">schedule.timezone</code>. Default is <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">Asia/Kolkata</code> for the ai-world topic. Use any <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank" style="color:#2563eb">IANA timezone string</a>.
+          </div>
+        </div>
+      </div>
+
+      <!-- Troubleshooting -->
+      <div id="helpTabTrouble" style="display:none;padding:20px;line-height:1.7;font-size:.875rem;color:#374151">
+        <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">🛠 Troubleshooting</h2>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Research run fails immediately</div>
+            Check that Ollama is running on the host:<br>
+            <code style="background:#111827;color:#e5e7eb;border-radius:6px;padding:6px 10px;display:block;margin-top:6px;font-size:.78rem">ollama list<br>curl http://localhost:11434/api/tags</code>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#dc2626;margin-bottom:4px">No search results / empty reports</div>
+            SearXNG may be starting up or temporarily rate-limited. Check container logs:<br>
+            <code style="background:#111827;color:#e5e7eb;border-radius:6px;padding:6px 10px;display:block;margin-top:6px;font-size:.78rem">./run.sh logs</code>
+            Also verify your research queries are specific and not empty.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Run times out after several minutes</div>
+            The LLM synthesis step is timing out. Your Ollama model may be too large for available RAM. Try a smaller model in <strong>⚙️ Settings → 🤖 Model</strong>:<br>
+            <code style="background:#111827;color:#e5e7eb;border-radius:6px;padding:6px 10px;display:block;margin-top:6px;font-size:.78rem">ollama pull llama3.2:3b</code>
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Dashboard shows "never run" after restart</div>
+            Expected — run status is in-memory. ScoutForge automatically restores it from the latest report file on startup. If it still shows "never run" and reports exist, check that the reports volume is correctly mounted in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">docker-compose.yml</code>.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Discord webhook not working</div>
+            Use <strong>🔔 Test Webhook</strong> in Settings → Topic Settings to verify the URL. Make sure the webhook URL starts with <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">https://discord.com/api/webhooks/</code>. Webhook URLs expire if deleted in Discord — regenerate if needed.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#dc2626;margin-bottom:4px">Scheduled run was missed</div>
+            If the container was restarted <em>after</em> the scheduled time today, the run fires immediately on the next startup (24h misfire window). Check container logs for <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">Research run started</code> entries.
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:12px 18px;border-top:1px solid #f3f4f6;font-size:.72rem;color:#9ca3af;text-align:center">
+        Agent ScoutForge &nbsp;·&nbsp; Developed by <strong style="color:#6b7280">Prakash Narayanamoorthy</strong>
+      </div>
+
+    </div><!-- /modal-body -->
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('helpModal')">Close</button>
     </div>
   </div>
 </div>
@@ -1445,6 +1690,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   document.getElementById('topicMgmtModal').addEventListener('click',function(e){
     if(e.target===this) closeModal('topicMgmtModal');
   });
+  document.getElementById('helpModal').addEventListener('click',function(e){
+    if(e.target===this) closeModal('helpModal');
+  });
+
+  function switchHelpTab(tab){
+    ['getting','topics','research','discord','schedule','trouble'].forEach(t=>{
+      const panel=document.getElementById('helpTab'+t.charAt(0).toUpperCase()+t.slice(1));
+      const btn=document.getElementById('helpTabBtn'+t.charAt(0).toUpperCase()+t.slice(1));
+      if(panel) panel.style.display=tab===t?'block':'none';
+      if(btn)   btn.classList.toggle('active',tab===t);
+    });
+  }
 
   // ── Schedule ──────────────────────────────────────────────────────
   function onFreqChange(){
