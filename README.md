@@ -25,10 +25,22 @@ You can also trigger ad-hoc research on any topic, ask questions across all past
 
 ## Who It's For
 
-- **AI product owners and researchers** who need to stay current on model releases, framework updates, and security incidents
-- **Security practitioners** tracking AI attack vectors, CVEs, compliance requirements, and governance developments
-- **Competitive intelligence teams** monitoring multiple domains simultaneously
-- **Anyone** who wants a curated, scheduled briefing on any topic delivered locally
+ScoutForge monitors any topic you can describe — here are some of the ways people use it:
+
+| Who | What they monitor |
+|---|---|
+| **Students & researchers** | Course topics, academic papers, exam syllabi updates, subject-area news |
+| **Share traders & investors** | Stock news, earnings reports, market moves, sector trends, macro indicators |
+| **AI practitioners & researchers** | Model releases, benchmark results, framework updates, security incidents |
+| **Security professionals** | CVEs, threat intelligence, compliance changes, governance frameworks |
+| **Entrepreneurs & founders** | Competitor moves, funding announcements, industry signals, regulation |
+| **Journalists & analysts** | Breaking developments across multiple beats, source discovery |
+| **Product managers** | Competitor feature launches, user sentiment, technology landscape shifts |
+| **Legal & compliance teams** | Regulatory updates, case law, policy changes in their jurisdiction |
+| **Healthcare professionals** | Clinical guidelines, drug approvals, medical research, public health news |
+| **Anyone curious** | Politics, sports, science, entertainment — any topic, on your schedule |
+
+If you can describe what you want to track in a few sentences, ScoutForge will do the rest — privately, locally, automatically.
 
 ---
 
