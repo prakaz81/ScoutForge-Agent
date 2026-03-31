@@ -217,6 +217,116 @@ _DIRECT_INJECTION_PATTERNS = [
 
 _COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _DIRECT_INJECTION_PATTERNS]
 
+# Extra patterns to catch jailbreak attempts in user chat inputs
+_USER_INPUT_EXTRA_PATTERNS = [
+    re.compile(r"\bDAN\b", re.IGNORECASE),
+    re.compile(r"\bjailbreak\b", re.IGNORECASE),
+    re.compile(r"ignore.{0,30}(instructions?|rules?|prompt)", re.IGNORECASE),
+    re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
+    re.compile(r"(act|pretend|behave)\s+as\s+(if\s+)?", re.IGNORECASE | re.DOTALL),
+    re.compile(r"(system|admin)\s+(prompt|override|mode)", re.IGNORECASE),
+]
+
+
+def _check_user_question(question: str) -> bool:
+    """Return True if the question looks like a prompt injection attempt."""
+    for pat in _COMPILED_PATTERNS + _USER_INPUT_EXTRA_PATTERNS:
+        if pat.search(question):
+            log.warning(f"[GUARDRAIL] Blocked user question: {question[:120]!r}")
+            return True
+    return False
+
+
+# ── Help Documentation (used for chatbot RAG) ─────────────────────────────────
+_HELP_DOC = """
+ScoutForge — Setup and User Guide
+
+GETTING STARTED
+ScoutForge is a self-hosted research agent that automatically monitors topics you define, searches the web, deduplicates findings against past reports, and synthesises intelligence briefs using a local LLM. Everything runs on your machine via Docker — no cloud, no subscriptions.
+
+Prerequisites: Docker Desktop (running), Ollama (installed on Mac host), a model pulled in Ollama (default: llama3.1:8b with `ollama pull llama3.1:8b`).
+
+To start: cd ScoutForge && ./run.sh setup  (first time) or ./run.sh start (subsequent starts). Open http://localhost:8888 in a browser.
+
+NAVIGATION / TOP BAR
+- ScoutForge brand on the left with tagline
+- Model Connected badge shows the active Ollama model
+- Adhoc Search button: opens modal for one-off live web research on any topic
+- Topic Mgmt button: create, configure, or delete topics
+- Help button: opens this guide
+- Credits button: developer info and open source stack
+
+TOPIC TABS AND ACTIONS
+- Topic tabs appear below the top bar; click to switch topics
+- Below the tabs: topic name + schedule info on the left; Run Now and Settings buttons on the right
+- Run Now: triggers immediate full research for the current topic
+- Settings (per-topic): opens Settings modal
+
+TOPIC MANAGEMENT (Topic Mgmt button)
+- Create: enter a topic name and description/goal; ScoutForge auto-generates skills and research queries using the LLM. The new tab appears without restart.
+- Delete: permanently removes the topic, config, and all its reports.
+- Empty skill indicator: amber dot on tab when Skills description is empty.
+
+SETTINGS MODAL (per-topic)
+Tabs:
+- Model: configure the Ollama model (global, applies to all topics)
+- Skills: plain-English description of what this topic monitors (shown on dashboard)
+- Research Queries: define research areas and search queries (add/edit/remove without restarting)
+- Topic Settings: report depth (1/2/3-pager), report style (Quick Summary/Q&A/Blog Post/Story), time range filter, max article age, dedup window, Discord webhook
+- Schedule: set frequency (daily/weekly/monthly), time, day; takes effect immediately
+- Guardrails: log of articles blocked by the prompt injection defence
+
+SCHEDULED RESEARCH RUNS
+Each topic runs on its own schedule. The pipeline: searches all configured areas → extracts article content → deduplicates against previous N reports → synthesises a structured brief with the LLM → saves as Markdown → optionally notifies Discord.
+Missed runs: 24-hour misfire window — if the container restarts after the scheduled time, the run fires immediately on startup.
+Schedule is in Settings → Schedule tab. Changes take effect immediately.
+
+REPORT DEPTH (Settings → Topic Settings)
+- 1-pager (default): Executive summary + per-area findings. Fastest.
+- 2-pager: Adds Key Insights & Takeaways section.
+- 3-pager: Full detail with Key Insights and a Watch List.
+
+REPORT STYLES (Settings → Topic Settings)
+- Quick Summary (default): Structured bullet-point intelligence brief with headings and sections.
+- Q&A: LLM generates key questions and answers from findings. Great for knowledge review.
+- Blog Post: Flowing narrative article with inline citations.
+- Story: Narrative storytelling format with chapters, prologue and epilogue.
+Each style renders as a formatted HTML report.
+
+ADHOC TOPIC SEARCH (Adhoc Search button)
+Opens a modal. Enter a topic, optional context, a depth (1–5 pages), and choose which topic to save under. A live web search is run and the report is saved immediately.
+
+ASK REPORTS CHATBOT (main page, left column)
+Chat-style Q&A window with a topic selector dropdown:
+- All Topics: searches the 3 most recent reports from every topic (up to 8 total)
+- Specific topic: searches the last 5 reports from that topic only
+- Help Docs: answer questions from this ScoutForge user guide
+
+Per-report chat: click the speech bubble icon next to any report for a chat window scoped to that single report.
+
+REPORT VIEWER
+Click the document icon on any report to open the HTML viewer with style-specific formatting. Includes a Print/Save PDF button and a Raw Markdown link.
+
+DISCORD NOTIFICATIONS (Settings → Topic Settings)
+Add a Discord webhook URL and optionally enable auto-notify for every scheduled run. Use the Test Webhook button to verify. To send a report manually, click the bell icon on any report.
+
+TROUBLESHOOTING
+- Research fails immediately: check Ollama is running: `ollama list` and `curl http://localhost:11434/api/tags`
+- No search results: check SearXNG started: `docker ps` and `./run.sh logs`
+- Run times out: model too large for RAM, try llama3.2:3b in Settings → Model
+- Shows never run after restart: normal — status is in-memory, restored from latest report file on startup
+- Discord not working: webhook URL must start with https://discord.com/api/webhooks/; use Test Webhook button
+
+CONTROL SCRIPT
+./run.sh setup — first-time build and start
+./run.sh start — start all services
+./run.sh stop — stop all services
+./run.sh restart — restart without rebuilding
+./run.sh rebuild — rebuild after code changes
+./run.sh logs — stream logs
+./run.sh open — open dashboard in browser
+"""
+
 
 def _check_direct_injection(article: dict) -> tuple[bool, str]:
     combined = f"{article.get('title', '')} {article.get('content', '')}"
@@ -540,7 +650,7 @@ FORMATTING RULES:
 - Do not repeat the same item in multiple sections."""
 
     depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
-    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}[style]
+    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}[style]
 
     # ── Style-specific prompts ────────────────────────────────────────
     if style == "qa":
@@ -620,6 +730,50 @@ Rules:
 - Appropriate for a professional technology/industry audience
 """
 
+    elif style == "story":
+        chapter_count = {1: 3, 2: 5, 3: 7}[depth]
+        prompt = f"""You are a master storyteller and technology journalist. Transform these research findings into a gripping narrative — told as a story, not a report.
+
+Today is {run_time.strftime('%B %d, %Y')}.
+All developments are from the last {max_days} days.
+{dedup_note}
+
+RESEARCH FINDINGS:
+{filtered_findings}
+
+---
+
+Write a compelling story covering the key developments of this period. Structure it like this:
+
+## [Dramatic, evocative title — as if for a technology thriller]
+
+*{run_time.strftime('%B %d, %Y')} · ScoutForge*
+
+---
+
+### Prologue
+[2–3 sentences. Set the scene. Open with tension, a turning point, or a striking fact that pulls the reader in.]
+
+[Write {chapter_count} chapters. Each chapter:
+### Chapter [N]: [Evocative chapter title]
+[3–5 paragraphs of flowing narrative. Use real names, dates, and events from the findings. Write as if telling a story to a colleague over coffee — vivid, direct, human. Connect events causally. Build towards implications. Cite sources as part of the narrative: "On March 28th, Anthropic quietly published…" or "Within days, the industry reacted…"]
+]
+
+### Epilogue: What Comes Next
+[Close the story. What cliffhangers remain? What is the unresolved tension? What should the reader watch for in the coming weeks? 2–4 paragraphs.]
+
+---
+
+*This story is based on {new_count} unique findings gathered by ScoutForge.*
+
+Rules:
+- Write in flowing, vivid narrative prose — absolutely NO bullet points
+- Ground every claim in the actual findings — do not invent events
+- Use real names, organisations, dates, and quotes from the findings
+- Build emotional and intellectual momentum across chapters
+- Write for a technically literate reader who also appreciates good storytelling
+"""
+
     else:  # summary (default)
         prompt = f"""You are a senior analyst and researcher producing a {depth_label} intelligence brief.
 
@@ -661,7 +815,7 @@ def save_report(
     depth       = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
     style       = expl_cfg.get("report_style", "summary")
     depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
-    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}.get(style, "Quick Summary")
+    style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}.get(style, "Quick Summary")
     header = (
         f"# {title} Research Brief\n"
         f"**Date**: {run_time.strftime('%A, %B %d, %Y — %H:%M:%S')}\n"
@@ -716,7 +870,7 @@ def run_research(expl_id: str | None = None) -> dict:
         depth = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
         style = expl_cfg.get("report_style", "summary")
         depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
-        style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}.get(style, "Quick Summary")
+        style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}.get(style, "Quick Summary")
         log.info(f"[{eid}] Step 4/4: Synthesizing {depth_label} {style_label} report...")
         _run_status[eid].update({"step": "4/4", "step_label": f"Synthesising {style_label} ({depth_label}) with Ollama", "step_detail": f"{new_count} unique findings → generating report"})
         body     = synthesize_advisory_report(filtered, run_time, total_articles, new_count, skipped, is_first_report, expl_cfg, depth, style)
@@ -882,17 +1036,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openTopicMgmt()">⊕ Topic Mgmt</button>
       <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openModal('helpModal')">❓ Help</button>
       <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openModal('creditsModal')">★ Credits</button>
-      <button class="btn btn-secondary" style="white-space:nowrap;border-radius:10px;font-size:.82rem;font-weight:600" onclick="openSettingsModal()">⚙️ Settings</button>
     </div>
   </div>
 
-  <!-- Topic Tabs -->
-  <div class="expl-tabs" style="margin-bottom:18px">
+  <!-- Topic Tabs + per-topic actions -->
+  <div class="expl-tabs" style="margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:none">
     {% for expl in explorations %}
     <a href="?expl={{ expl.id }}" class="expl-tab {% if expl.id == active_expl_id %}active{% endif %}">
       {% if not expl.has_skill %}<span style="color:#f59e0b;font-size:.65rem;vertical-align:middle" title="No skill description set">●</span> {% endif %}{{ expl.title }}
     </a>
     {% endfor %}
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;padding:8px 12px;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+    <div style="font-size:.78rem;color:#6b7280">
+      <span style="font-weight:600;color:#111827">{{ active_expl_title }}</span>
+      &nbsp;·&nbsp; <span id="schedDescBar">{{ schedule_desc }}</span> &nbsp;·&nbsp; Next: <span id="schedNextBar">{{ next_run }}</span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-primary btn-sm" onclick="triggerRun()" id="runBtn">▶ Run Now</button>
+      <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()">⚙️ Settings</button>
+    </div>
   </div>
 
   <!-- About (from skills file) -->
@@ -937,11 +1100,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <!-- LEFT COLUMN -->
     <div>
 
-      <!-- Run Control -->
-      <div class="card">
-        <div class="card-title">Research Run</div>
-        <button class="btn btn-primary" onclick="triggerRun()" id="runBtn">▶ Run Full Research Now</button>
-        <div class="progress" id="runProgress">
+      <!-- Run Progress -->
+      <div class="card" id="runProgressCard" style="display:none">
+        <div class="card-title">Research Running</div>
+        <div class="progress show" id="runProgress">
           <div><span class="spin">⟳</span><span id="runMsg" class="info">Starting...</span></div>
           <div id="runStep" style="margin-top:5px;color:#475569"></div>
         </div>
@@ -956,6 +1118,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             {% for expl in explorations %}
             <option value="{{ expl.id }}" {% if expl.id == active_expl_id %}selected{% endif %}>{{ expl.title }}</option>
             {% endfor %}
+            <option value="__help__">❓ Help Docs</option>
           </select>
         </div>
         <div id="chatHistory" style="max-height:260px;overflow-y:auto;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:8px;min-height:72px">
@@ -1009,6 +1172,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
 
   </div><!-- /grid2 -->
+
+  <!-- Page footer -->
+  <div style="margin-top:24px;padding:12px 0;border-top:1px solid #e5e7eb;text-align:center;font-size:.7rem;color:#d1d5db">
+    ScoutForge &nbsp;·&nbsp;
+    <button onclick="openModal('creditsModal')" style="background:none;border:none;color:#d1d5db;font-size:.7rem;cursor:pointer;padding:0;text-decoration:underline dotted">Developed by Prakash Narayanamoorthy</button>
+    &nbsp;·&nbsp; Local AI · No cloud · No subscriptions
+  </div>
 
 </div><!-- /shell -->
 
@@ -1074,8 +1244,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           Changes take effect on the next research run — no rebuild required.
         </p>
         <div id="queriesContainer"></div>
-        <button class="btn btn-secondary btn-sm" onclick="addQueryArea()" style="margin-top:8px">+ Add Research Area</button>
-        <div id="queriesMsg" style="font-size:.78rem;min-height:1.2em;margin-top:10px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="addQueryArea()">+ Add Research Area</button>
+          <button class="btn btn-primary btn-sm" onclick="saveQueries()">💾 Save Queries</button>
+          <span id="queriesMsg" style="font-size:.78rem;min-height:1.2em"></span>
+        </div>
       </div>
 
       <!-- Topic Settings Tab -->
@@ -1099,6 +1272,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               <option value="summary">Quick Summary (default)</option>
               <option value="qa">Q&amp;A</option>
               <option value="blog">Blog Post</option>
+              <option value="story">Story</option>
             </select>
             <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">
               <strong>Quick Summary</strong> — structured bullet-point intelligence brief.<br>
@@ -1214,11 +1388,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <button class="btn btn-secondary btn-sm" onclick="loadGuardrails()">↺ Refresh</button>
           <button class="btn btn-danger btn-sm" onclick="clearGuardrails()">🗑 Clear Log</button>
         </div>
-      </div>
-
-      <!-- Credits -->
-      <div style="padding:14px 18px 0;border-top:1px solid #f3f4f6;font-size:.72rem;color:#9ca3af;text-align:center">
-        ScoutForge &nbsp;·&nbsp; Developed by <strong style="color:#6b7280">Prakash Narayanamoorthy</strong>
       </div>
 
     </div><!-- /modal-body -->
@@ -1408,29 +1577,47 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Full Research Run</div>
             Searches all configured areas, fetches article content, deduplicates against previous reports, and synthesises a structured intelligence brief. Progress is shown step by step. Typical duration: <strong>4–10 minutes</strong>.<br><br>
-            <strong>Report depth</strong> is set per topic in <strong>⚙️ Settings → ⚙ Topic Settings → Scheduled Report Depth</strong>:<br>
+            <strong>Report depth</strong> (⚙️ Settings → ⚙ Topic Settings → Scheduled Report Depth):<br>
             <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:2px">
               <li><strong>1-pager</strong> (default) — Executive summary + per-area findings. Fastest.</li>
               <li><strong>2-pager</strong> — Adds Key Insights &amp; Takeaways section.</li>
-              <li><strong>3-pager</strong> — Full detail with Key Insights and a Watch List of signals to monitor.</li>
+              <li><strong>3-pager</strong> — Full detail with Key Insights and a Watch List.</li>
             </ul>
+            <br>
+            <strong>Report style</strong> (⚙️ Settings → ⚙ Topic Settings → Report Style):<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
+              <li><strong>Quick Summary</strong> (default) — Structured bullet-point intelligence brief with headings and sections.</li>
+              <li><strong>Q&amp;A</strong> — The LLM generates key questions and answers from the findings. Great for knowledge review.</li>
+              <li><strong>Blog Post</strong> — Flowing narrative article with inline citations. Readable as a standalone piece.</li>
+            </ul>
+            Each style renders as a formatted HTML report with style-specific layout.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Live Topic Research</div>
-            One-off deep-dive on any subject. Enter a topic (e.g. "MCP security risks"), optionally add context, choose a depth (1–5 pages), and click <strong>🔍 Research This Topic</strong>. Result is saved as a report immediately.
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">🔍 Adhoc Topic Search</div>
+            Click the <strong>🔍 Adhoc Search</strong> button in the top bar to open a search modal.<br>
+            Enter any topic, optional context, a depth (1–5 pages), and choose which topic to save the result under. The report is saved immediately and appears in the Intelligence Reports list.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Ask All Reports (RAG)</div>
-            Ask any question — ScoutForge searches across the last 5 reports and synthesises an answer using the LLM. Example: <em>"What CVEs were disclosed this week?"</em>
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">💬 Ask Reports — Chatbot</div>
+            The <strong>Ask Reports</strong> panel on the main page is a chatbot window. Select a scope from the dropdown:<br>
+            <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
+              <li><strong>All Topics</strong> — searches the 3 most recent reports from every topic (up to 8 total)</li>
+              <li><strong>Specific topic</strong> — searches the last 5 reports from that topic only</li>
+            </ul>
+            Type your question and hit <strong>Ask</strong> — responses appear in a conversation thread below. Example: <em>"What new CVEs were disclosed across all my topics this week?"</em>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
-            <div style="font-weight:700;color:#111827;margin-bottom:6px">Per-Report Chat (💬)</div>
-            Click the 💬 icon on any report to open a focused chat window. Questions are answered using only that report's content — great for drilling into a specific brief.
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">💬 Per-Report Chat</div>
+            Click the 💬 icon next to any report to open a focused chat window scoped to that single report only. Great for drilling into a specific brief.
+          </div>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
+            <div style="font-weight:700;color:#111827;margin-bottom:6px">📄 Report Viewer &amp; Print</div>
+            Click the 📄 icon on any report to open the full HTML viewer. The viewer applies style-specific formatting. Use the <strong>🖨 Print / Save PDF</strong> button to export the report as a PDF. A <strong>Raw Markdown</strong> link is also available for plain text access.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Report file naming</div>
             <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">research_brief_{topic}_{YYYYMMDD_HHMMSS}.md</code> — scheduled run<br>
-            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md</code> — live topic research<br>
+            <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md</code> — adhoc search<br>
             Reports are stored in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:.78rem">./reports/{topic-id}/</code>
           </div>
         </div>
@@ -1479,15 +1666,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:16px">📅 Schedule</h2>
 
         <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-size:.82rem;color:#1e40af">
+            The schedule is now managed in <strong>⚙️ Settings → 📅 Schedule</strong> (no longer a card on the main page).
+          </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Setting the schedule</div>
-            The <strong>Schedule</strong> card on the main topic page lets you set:<br>
+            Open <strong>⚙️ Settings → 📅 Schedule</strong>. Configure:<br>
             <ul style="list-style:disc;padding-left:18px;margin-top:6px;display:flex;flex-direction:column;gap:3px">
               <li><strong>Frequency</strong> — Daily, Weekly, or Monthly</li>
               <li><strong>Time</strong> — hour and minute (24h format)</li>
               <li><strong>Day of week</strong> (weekly) or <strong>Day of month</strong> (monthly)</li>
             </ul>
-            Click <strong>💾 Save</strong> — takes effect immediately, no restart needed.
+            Click <strong>💾 Save Schedule</strong> — takes effect immediately, no restart needed. The current schedule and next run time are shown at the top of the tab.
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Missed runs &amp; container restarts</div>
@@ -1495,7 +1685,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Timezone</div>
-            The schedule timezone is set in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">explorations/{id}/config.yaml</code> under <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">schedule.timezone</code>. Default is <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">Asia/Kolkata</code> for the ai-world topic. Use any <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank" style="color:#2563eb">IANA timezone string</a>.
+            The schedule timezone is set in <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">explorations/{id}/config.yaml</code> under <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">schedule.timezone</code>. Use any IANA timezone string (e.g. <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">Asia/Kolkata</code>, <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">America/New_York</code>, <code style="background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px">UTC</code>).
           </div>
         </div>
       </div>
@@ -1536,11 +1726,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
       </div>
 
-      <!-- Footer -->
-      <div style="padding:12px 18px;border-top:1px solid #f3f4f6;font-size:.72rem;color:#9ca3af;text-align:center">
-        ScoutForge &nbsp;·&nbsp; Developed by <strong style="color:#6b7280">Prakash Narayanamoorthy</strong>
-      </div>
-
     </div><!-- /modal-body -->
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('helpModal')">Close</button>
@@ -1564,11 +1749,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <!-- Create new topic -->
       <div style="margin-bottom:20px;padding:14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px">
         <div class="card-title" style="margin-bottom:10px">Create New Topic</div>
-        <div class="input-row" style="margin-bottom:8px">
-          <input type="text" id="newTopicName" placeholder="Topic name (e.g. Crypto News, EU Regulation…)" onkeydown="if(event.key==='Enter')createTopic()" maxlength="60">
-          <button class="btn btn-primary" onclick="createTopic()" id="createTopicBtn">Create</button>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input type="text" id="newTopicName" placeholder="Topic name (e.g. Crypto News, EU Regulation…)" maxlength="60">
+          <textarea id="newTopicGoal" rows="3" placeholder="Describe your goal (2–3 lines, required)&#10;e.g. I want to monitor the latest AI security incidents, CVE disclosures affecting AI systems, and governance frameworks. Focus on enterprise risk and practical mitigations."></textarea>
+          <div style="font-size:.72rem;color:#9ca3af">ScoutForge will use this description to auto-generate your Skills description and initial research queries.</div>
+          <button class="btn btn-primary" onclick="createTopic()" id="createTopicBtn" style="align-self:flex-start">✨ Create &amp; Auto-Configure</button>
         </div>
-        <div id="createTopicMsg" style="font-size:.78rem;min-height:1.2em"></div>
+        <div id="createTopicMsg" style="font-size:.78rem;min-height:1.2em;margin-top:8px"></div>
       </div>
       <!-- Existing topics list -->
       <div class="card-title" style="margin-bottom:10px">Existing Topics</div>
@@ -1668,11 +1855,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   let currentReportFile='';
 
   // ── Run Full Research ─────────────────────────────────────────────
-  async function triggerRun() {
+  function _setRunBtn(running){
     const btn=document.getElementById('runBtn');
-    const prog=document.getElementById('runProgress');
-    btn.disabled=true; btn.textContent='⟳ Running...';
-    prog.classList.add('show');
+    if(!btn) return;
+    btn.disabled=running;
+    btn.textContent=running?'⟳ Running...':'▶ Run Now';
+  }
+  function _showRunCard(show){
+    const card=document.getElementById('runProgressCard');
+    if(card) card.style.display=show?'block':'none';
+  }
+
+  async function triggerRun() {
+    _setRunBtn(true); _showRunCard(true);
     document.getElementById('runMsg').className='info';
     document.getElementById('runMsg').textContent='Starting...';
     document.getElementById('runStep').textContent='';
@@ -1683,11 +1878,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   async function checkStatus(){
     try {
       const d=await(await fetch('/api/status?expl='+EXPL_ID)).json();
-      const prog=document.getElementById('runProgress');
       if(d.status==='running'){
-        prog.classList.add('show');
-        document.getElementById('runBtn').disabled=true;
-        document.getElementById('runBtn').textContent='⟳ Running...';
+        _setRunBtn(true); _showRunCard(true);
         if(d.step_label){
           document.getElementById('runMsg').className='info';
           document.getElementById('runMsg').textContent=(d.step?'Step '+d.step+' — ':'')+d.step_label;
@@ -1695,8 +1887,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         document.getElementById('runStep').textContent=d.step_detail||'';
       } else if(d.status==='success'||d.status==='error'){
         clearInterval(refreshTimer);
-        document.getElementById('runBtn').disabled=false;
-        document.getElementById('runBtn').textContent='▶ Run Full Research Now';
+        _setRunBtn(false);
         document.getElementById('runMsg').className=d.status==='success'?'ok':'err';
         if(d.status==='success'){
           document.getElementById('runMsg').textContent='✔ Done! '+d.report;
@@ -1714,9 +1905,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     try{
       const d=await(await fetch('/api/status?expl='+EXPL_ID)).json();
       if(d.status==='running'){
-        document.getElementById('runBtn').disabled=true;
-        document.getElementById('runBtn').textContent='⟳ Running...';
-        document.getElementById('runProgress').classList.add('show');
+        _setRunBtn(true); _showRunCard(true);
         refreshTimer=setInterval(checkStatus,5000);
       }
     }catch(e){}
@@ -1763,7 +1952,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         aDiv.textContent=d.answer;
         const meta=document.createElement('div');
         meta.style.cssText='font-size:.68rem;color:#9ca3af;margin-top:6px';
-        const label=topicVal==='__all__'?'All Topics':'Topic: '+topicVal;
+        const label=topicVal==='__all__'?'All Topics':topicVal==='__help__'?'Help Docs':'Topic: '+topicVal;
         meta.textContent=label+' · '+d.reports_searched.length+' report(s) searched';
         aDiv.appendChild(meta);
       }
@@ -2205,23 +2394,26 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   async function createTopic(){
     const name=document.getElementById('newTopicName').value.trim();
+    const goal=document.getElementById('newTopicGoal').value.trim();
     const msg=document.getElementById('createTopicMsg');
     if(!name){document.getElementById('newTopicName').focus();return;}
+    if(!goal){document.getElementById('newTopicGoal').focus();msg.textContent='⚠ Please describe your goal.';msg.style.color='#dc2626';return;}
     const btn=document.getElementById('createTopicBtn');
-    btn.disabled=true; btn.textContent='Creating…';
-    msg.textContent=''; msg.style.color='#6b7280';
+    btn.disabled=true; btn.textContent='⟳ Creating & auto-configuring…';
+    msg.textContent='Creating topic and generating skills + queries with AI — this takes ~30 seconds…'; msg.style.color='#6b7280';
     try{
-      const r=await fetch('/api/topics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+      const r=await fetch('/api/topics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,goal})});
       const d=await r.json();
       if(d.error){msg.textContent='⚠ '+d.error;msg.style.color='#dc2626';}
       else{
-        msg.textContent='✔ Topic "'+d.title+'" created! Open it to configure.';
+        msg.textContent='✔ Topic "'+d.title+'" created with auto-generated skills and queries! Open it to review.';
         msg.style.color='#16a34a';
         document.getElementById('newTopicName').value='';
+        document.getElementById('newTopicGoal').value='';
         loadTopicMgmtList();
       }
     }catch(e){msg.textContent='⚠ '+e.message;msg.style.color='#dc2626';}
-    btn.disabled=false; btn.textContent='Create';
+    btn.disabled=false; btn.textContent='✨ Create & Auto-Configure';
   }
 
   async function deleteTopic(id,title){
@@ -2482,6 +2674,8 @@ def view_report(expl_id: str, filename: str):
         style = "qa"
     elif "**Style**: Blog Post" in raw:
         style = "blog"
+    elif "**Style**: Story" in raw:
+        style = "story"
 
     # Convert markdown → HTML
     body_html = md_lib.markdown(raw, extensions=["tables", "fenced_code", "nl2br"])
@@ -2502,6 +2696,19 @@ def view_report(expl_id: str, filename: str):
         em{color:#6b7280;font-size:.92rem}
         """
         style_badge = '<span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700">Blog Post</span>'
+    elif style == "story":
+        style_css = """
+        .report-body{max-width:680px;margin:0 auto;font-size:1.08rem;line-height:2;font-family:Georgia,'Times New Roman',serif}
+        h1{font-size:2rem;font-weight:900;color:#111827;text-align:center;margin-bottom:6px;line-height:1.2}
+        h2{font-size:1.4rem;font-weight:800;color:#1e293b;margin-top:44px;margin-bottom:10px;text-align:center;font-style:italic}
+        h3{font-size:1.1rem;font-weight:700;color:#374151;margin-top:36px;margin-bottom:8px;letter-spacing:.03em;text-transform:uppercase;font-size:.85rem}
+        p{margin-bottom:20px;color:#1e293b;text-indent:1.5em}
+        p:first-of-type{text-indent:0}
+        em{color:#6b7280}
+        hr{border:none;text-align:center;margin:32px 0}
+        hr::after{content:'✦  ✦  ✦';color:#9ca3af;font-size:.9rem}
+        """
+        style_badge = '<span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:20px;padding:3px 12px;font-size:.78rem;font-weight:700">📖 Story</span>'
     else:
         style_css = """
         h2{color:#111827;border-bottom:2px solid #e5e7eb;padding-bottom:8px;margin-top:32px}
@@ -2742,6 +2949,21 @@ def api_ask_all():
     if not question:
         return jsonify({"error": "Provide a question"}), 400
 
+    # Guardrail: block prompt injection attempts in user questions
+    if _check_user_question(question):
+        return jsonify({"error": "⛔ Your question was blocked by the prompt injection guardrail. Please ask a genuine research question."}), 400
+
+    # Help docs RAG
+    if expl_id == "__help__":
+        answer = call_ollama(
+            f"SCOUTFORGE USER GUIDE:\n{_HELP_DOC}\n\nQUESTION: {question}",
+            system=(
+                "You are the ScoutForge assistant. Answer the user's question using ONLY the user guide provided. "
+                "Be helpful, clear, and concise. If the answer is not in the guide, say so."
+            )
+        )
+        return jsonify({"answer": answer, "reports_searched": ["ScoutForge Help Docs"]})
+
     # Collect reports — either all topics or a specific one
     all_reports: list[Path] = []
     if expl_id == "__all__":
@@ -2780,6 +3002,8 @@ def api_ask_report(expl_id: str, filename: str):
         return jsonify({"error": "Report not found"}), 404
     if not question:
         return jsonify({"error": "Provide a question"}), 400
+    if _check_user_question(question):
+        return jsonify({"error": "⛔ Your question was blocked by the prompt injection guardrail."}), 400
     content = filepath.read_text()
     answer = call_ollama(
         f"REPORT: {filename}\n\n{content[:8000]}\n\nQUESTION: {question}",
@@ -2916,7 +3140,9 @@ def api_topics_list():
 
 @app.route("/api/topics", methods=["POST"])
 def api_topics_create():
-    name = (request.json or {}).get("name", "").strip()
+    body = request.json or {}
+    name = body.get("name", "").strip()
+    goal = body.get("goal", "").strip()
     if not name:
         return jsonify({"error": "Provide a topic name"}), 400
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
@@ -2928,18 +3154,51 @@ def api_topics_create():
     if expl_dir.exists():
         return jsonify({"error": f"Directory '{slug}' already exists"}), 409
     expl_dir.mkdir(parents=True)
+
+    # Auto-generate skills and research queries from goal if provided
+    ai_topics: list[dict] = []
+    skill_body = ""
+    if goal:
+        try:
+            skill_body = call_ollama(
+                f"You are helping set up a research monitoring agent for the topic: \"{name}\".\n\n"
+                f"The user's goal: {goal}\n\n"
+                f"Write a concise 2–4 sentence plain-English description of what this topic monitors and why it matters. "
+                f"No headings, no bullet points. Just clear prose suitable for an 'About this topic' blurb.",
+                system="You are a research analyst. Return only the description text, nothing else."
+            )
+            queries_raw = call_ollama(
+                f"You are configuring a web research agent for the topic: \"{name}\".\n\n"
+                f"The user's goal: {goal}\n\n"
+                f"Generate 3 research areas, each with 4 targeted web search queries.\n\n"
+                f"Return ONLY valid JSON (no markdown, no code fences) in this exact format:\n"
+                f'[{{"area":"Area Name","queries":["query 1","query 2","query 3","query 4"]}}, ...]',
+                system="You are a research query generator. Return only valid JSON. No markdown. No explanation."
+            )
+            # Strip markdown code fences if model adds them
+            queries_raw = re.sub(r"^```[a-z]*\n?", "", queries_raw.strip(), flags=re.MULTILINE)
+            queries_raw = re.sub(r"\n?```$", "", queries_raw.strip())
+            parsed = __import__("json").loads(queries_raw.strip())
+            if isinstance(parsed, list):
+                ai_topics = parsed[:5]
+        except Exception as e:
+            log.warning(f"AI auto-configure failed for {slug}: {e}")
+
     cfg = {
         "id": slug,
         "title": name,
-        "description": "",
+        "description": goal,
         "schedule": {"frequency": "daily", "hour": 8, "minute": 0, "timezone": "UTC", "day_of_week": "mon", "day": 1},
-        "research": {"time_range": "", "max_age_months": 3, "dedup_against_last_n_reports": 2, "topics": []},
+        "research": {"time_range": "", "max_age_months": 3, "dedup_against_last_n_reports": 2, "topics": ai_topics},
     }
     with open(expl_dir / "config.yaml", "w") as f:
         yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    skills_stub = f"---\nname: {slug}\ndisplay_name: {name}\nversion: 1.0.0\n---\n"
-    (expl_dir / "skills.md").write_text(skills_stub)
-    (expl_dir / "skills.default.md").write_text(skills_stub)
+
+    skills_content = skill_body.strip() if skill_body.strip() else ""
+    skills_text = f"---\nname: {slug}\ndisplay_name: {name}\nversion: 1.0.0\n---\n\n{skills_content}\n"
+    (expl_dir / "skills.md").write_text(skills_text)
+    (expl_dir / "skills.default.md").write_text(skills_text)
+
     _reload_explorations()
     if _scheduler is not None:
         new_cfg = EXPLORATIONS.get(slug)
@@ -2948,8 +3207,8 @@ def api_topics_create():
             _scheduler.add_job(run_research, _build_cron_trigger(s), args=[slug],
                                id=f"research_{slug}", replace_existing=True,
                                misfire_grace_time=86400, coalesce=True)
-    log.info(f"Topic created: {slug} ({name})")
-    return jsonify({"status": "created", "id": slug, "title": name})
+    log.info(f"Topic created: {slug} ({name}), ai_topics={len(ai_topics)}")
+    return jsonify({"status": "created", "id": slug, "title": name, "ai_topics": len(ai_topics)})
 
 
 @app.route("/api/topics/<topic_id>/config", methods=["GET"])
@@ -2998,7 +3257,7 @@ def api_topic_config_save(topic_id: str):
             raw["research"]["topics"] = r["topics"]
         if "report_depth" in body:
             raw["report_depth"] = max(1, min(3, int(body["report_depth"])))
-        if "report_style" in body and body["report_style"] in ("summary", "qa", "blog"):
+        if "report_style" in body and body["report_style"] in ("summary", "qa", "blog", "story"):
             raw["report_style"] = body["report_style"]
         if "discord_webhook" in body:
             raw["discord_webhook"] = body["discord_webhook"]
@@ -3061,9 +3320,11 @@ def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
         style = "qa"
     elif "**Style**: Blog Post" in text:
         style = "blog"
+    elif "**Style**: Story" in text:
+        style = "story"
 
-    style_icon = {"summary": "📋", "qa": "❓", "blog": "📝"}.get(style, "📋")
-    style_name = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post"}.get(style, "Quick Summary")
+    style_icon = {"summary": "📋", "qa": "❓", "blog": "📝", "story": "📖"}.get(style, "📋")
+    style_name = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}.get(style, "Quick Summary")
 
     header = f"**📡 ScoutForge — {title}** · {style_icon} {style_name}\n**Report:** `{report_path.name}`\n\n"
 
@@ -3081,6 +3342,10 @@ def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
         # Extract intro paragraphs (skip metadata lines)
         body = [l for l in lines if l and not l.startswith("**") and not l.startswith("#")]
         excerpt = "\n".join(body[:12])
+    elif style == "story":
+        # Extract prologue / first chapter
+        body = [l for l in lines if l and not l.startswith("**") and not l.startswith("*Published")]
+        excerpt = "\n".join(body[:14])
     else:
         # Extract executive summary bullets
         in_exec = False

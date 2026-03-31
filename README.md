@@ -17,8 +17,9 @@ Every day (or on a schedule you choose), the agent:
 3. **Deduplicates** against previous reports — only new, unique findings are included
 4. **Synthesizes** a structured intelligence brief using a local LLM
 5. **Saves** the brief as a Markdown file and displays it in a web dashboard
+6. **Notifies** your Discord channel (optional, per-topic, automatic or on-demand)
 
-You can also trigger research on-demand, ask questions about past reports, and run deep-dives on any topic — all from the browser.
+You can also trigger ad-hoc research on any topic, ask questions across all past reports via a chatbot, and run deep-dives — all from the browser.
 
 ---
 
@@ -38,14 +39,19 @@ You can also trigger research on-demand, ask questions about past reports, and r
 - **Research Queries editor** — add, edit, and remove research areas and their search queries from the browser
 - **Intelligent deduplication** — Ollama compares new findings against previous reports so every brief contains only genuinely new information
 - **Local-first** — Ollama (LLM) and SearXNG (search) run locally; no cloud AI or third-party search APIs needed
-- **Scheduled runs** — Daily, weekly, or monthly; configurable per topic from the dashboard without restarting
-- **Live topic research** — Trigger ad-hoc research on any topic and get a new report instantly
+- **Scheduled runs** — Daily, weekly, or monthly; configurable per topic from Settings without restarting
+- **🔍 Adhoc Topic Search** — Live web search on any topic via a modal; choose depth and target topic; result saved as a report instantly
+- **💬 Ask Reports chatbot** — Chat-style Q&A window with topic selector (All Topics or specific); RAG across recent reports
 - **Per-report Q&A** — Ask any question scoped to a single report (RAG over that report only)
-- **Ask All Reports** — RAG across all saved reports for cross-brief questions
 - **Adjustable report depth** — 1-pager summary through full 5-page intelligence report
+- **Report styles** — Quick Summary (structured bullets), Q&A (question/answer pairs), Blog Post (flowing narrative)
+- **HTML report viewer** — Reports rendered as formatted HTML with style-specific layout
+- **Print / Save as PDF** — One-click print button on every report viewer page
+- **Discord notifications** — Per-topic webhook; auto-notify on every scheduled run or send manually per report
 - **Real-time progress tracking** — Dashboard shows exactly which step is running
-- **Prompt injection guardrails** — Two-stage defence (static patterns + LLM semantic check) on every article before it enters the pipeline
+- **Prompt injection guardrails** — Two-stage defence (static patterns + LLM semantic check) on every article before it enters the pipeline; also applied to chatbot inputs
 - **Skills descriptions** — Plain-English description per topic shown on the dashboard; empty-skill indicator when not yet configured
+- **★ Credits modal** — Developed by Prakash Narayanamoorthy; open source stack listed
 
 ---
 
@@ -72,7 +78,7 @@ You can also trigger research on-demand, ask questions about past reports, and r
 │   Ollama (Mac host)     │
 │   llama3.1:8b           │
 │   Dedup · Synthesis     │
-│   Q&A · Topic research  │
+│   Q&A · Adhoc research  │
 └─────────────────────────┘
 
 Browser → http://localhost:8888
@@ -146,13 +152,24 @@ Open `http://localhost:8888` in a browser.
 
 ### Navigation
 
-The top nav shows one tab per topic. Click **⊕ Topic Mgmt** (always visible on the right) to create, manage, or delete topics.
+The **top bar** shows the ScoutForge brand on the left and action buttons on the right:
+
+| Button | What it does |
+|---|---|
+| **🤖 Model Connected: \<name\>** | Shows the active Ollama model |
+| **🔍 Adhoc Search** | Opens the Adhoc Topic Search modal |
+| **⊕ Topic Mgmt** | Create, manage, or delete topics |
+| **❓ Help** | In-app setup and usage guide |
+| **★ Credits** | Developer info + open source stack |
+| **⚙️ Settings** | Per-topic settings modal |
+
+Below the top bar, **topic tabs** let you switch between topics.
 
 ### Topic Management
 
-- **Create** — Enter a name and click Create. ScoutForge scaffolds the config and skill files immediately; the new tab appears in the nav without a restart.
+- **Create** — Enter a name and click Create. ScoutForge scaffolds the config and skill files immediately; the new tab appears without a restart.
 - **Delete** — Removes the topic, its config, and all its reports.
-- **Configure** — After creating a topic, open it and use ⚙️ Settings to fill in its research queries and skill description.
+- **Configure** — After creating a topic, open it and use ⚙️ Settings to fill in its research queries, skill description, schedule, and report style.
 
 ### Settings Modal (per topic)
 
@@ -161,7 +178,8 @@ The top nav shows one tab per topic. Click **⊕ Topic Mgmt** (always visible on
 | **🤖 Model** | Ollama model used for synthesis and Q&A (global) |
 | **📋 Skills** | Plain-English description of what the topic monitors (shown on dashboard) |
 | **🔍 Research Queries** | Research areas and their search queries — add/edit/remove without restarting |
-| **⚙ Topic Settings** | Time range filter, max article age, dedup window |
+| **⚙ Topic Settings** | Report depth, report style, time range filter, max article age, dedup window, Discord webhook |
+| **📅 Schedule** | Frequency (daily/weekly/monthly), time, day — takes effect immediately |
 | **🛡️ Guardrails** | Log of articles blocked by the prompt injection defence |
 
 ### Empty Skill Indicator
@@ -174,10 +192,29 @@ Topics without a skill description show an amber **●** dot in the nav tab and 
 |---|---|
 | **Last Run** | Status badge, timestamp, report name, stats (gathered / unique / deduped) |
 | **Research Run** | Trigger full research now; real-time step-by-step progress while running |
-| **Ask All Reports** | Type any question — searches last 5 reports and synthesizes an answer |
-| **Schedule** | Change frequency (Daily / Weekly / Monthly), time, and day — takes effect immediately |
-| **Live Topic Research** | One-off web research on any topic; choose depth (1–5 pages); result saved as a report |
-| **Intelligence Reports** | All saved reports with type badges, view button, per-report chat, delete |
+| **💬 Ask Reports** | Chatbot window — select All Topics or a specific topic, ask any question, get AI answers from past reports |
+| **Intelligence Reports** | All saved reports with type badges, view button, per-report chat, Discord send, delete |
+
+### Adhoc Topic Search
+
+Click **🔍 Adhoc Search** in the top bar to open the modal. Enter a topic, optional context, a depth (1–5 pages), and which topic to save the result under. The report is generated live and saved immediately.
+
+### Ask Reports Chatbot
+
+The **💬 Ask Reports** panel is a chat-style window. Use the dropdown to search:
+- **All Topics** — searches the 3 most recent reports from every topic (up to 8 total)
+- **Specific topic** — searches the 5 most recent reports from that topic
+
+Questions and answers appear as conversation bubbles. Example: *"What new AI security incidents were reported this month across all topics?"*
+
+### Report Viewer
+
+Click the 📄 icon next to any report to open the full HTML viewer with style-specific formatting:
+- **Quick Summary** — structured sections with headings and bullet points
+- **Q&A** — question cards with answer blocks and source links
+- **Blog Post** — flowing narrative with prose layout
+
+The viewer includes a **🖨 Print / Save PDF** button and a **Raw Markdown** link.
 
 ### Per-Report Chat
 
@@ -191,7 +228,7 @@ Reports are saved as Markdown files under `./reports/{topic-id}/` with this nami
 
 ```
 research_brief_{topic}_{YYYYMMDD_HHMMSS}.md    ← Scheduled full research run
-topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md   ← On-demand live topic research
+topic_{topic}_{subject}_{YYYYMMDD_HHMMSS}.md   ← Adhoc topic search
 product_brief_{name}_{YYYYMMDD_HHMMSS}.md      ← On-demand product research
 ```
 
@@ -223,7 +260,7 @@ report:
 
 ### Per-topic config — `explorations/{id}/config.yaml`
 
-Controls the schedule, research areas, and queries for each topic. Editable from the dashboard via **⚙️ Settings → Research Queries** and **⚙️ Settings → Topic Settings**.
+Controls the schedule, research areas, queries, report depth, and report style for each topic. Editable from the dashboard via ⚙️ Settings.
 
 ```yaml
 id: my-topic
@@ -234,6 +271,12 @@ schedule:
   hour: 8
   minute: 0
   timezone: "Asia/Kolkata"
+
+report_depth: 1            # 1 | 2 | 3
+report_style: "summary"    # summary | qa | blog
+
+discord_webhook: ""
+discord_auto_notify: false
 
 research:
   time_range: ""            # "" | "day" | "week" | "month"
@@ -311,8 +354,9 @@ ScoutForge/
 | Scheduling | APScheduler (CronTrigger) | Per-topic automated runs |
 | Search | SearXNG (self-hosted) | Privacy-respecting multi-engine web search |
 | Article Extraction | Trafilatura | Converts web pages to clean text |
-| LLM Inference | Ollama (local) | Deduplication, synthesis, Q&A |
+| LLM Inference | Ollama (local) | Deduplication, synthesis, Q&A, guardrails |
 | Default Model | llama3.1:8b | Runs on 8 GB RAM |
+| Report Rendering | Python-Markdown | Markdown → styled HTML report viewer |
 | Container Orchestration | Docker Compose | Multi-service stack with health checks |
 | Report Format | Markdown | Portable, readable, version-controllable |
 
@@ -340,6 +384,10 @@ curl http://localhost:11434/api/tags
 ```
 
 On Linux hosts, replace `host.docker.internal` with your Docker bridge IP (usually `172.17.0.1`).
+
+### Discord notifications not sending
+
+Use **🔔 Test Webhook** in ⚙️ Settings → ⚙ Topic Settings to verify the webhook URL. Make sure it starts with `https://discord.com/api/webhooks/`. Webhook URLs expire if deleted in Discord — regenerate if needed.
 
 ---
 
