@@ -1229,11 +1229,21 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
       <!-- Skill Tab -->
       <div id="tabSkill" style="display:none;padding:16px 18px">
-        <p style="font-size:.82rem;color:#6b7280;margin-bottom:10px">
-          Plain English description of this exploration — what it monitors and how to use it.
-          The first paragraph is shown on the dashboard as the description.
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.8rem;color:#1e40af;line-height:1.5">
+          <strong>💡 Better goal = better results.</strong> The more detail in your goal description, the more targeted the auto-generated Skills and Research Queries will be.
+          A strong goal names <em>what</em> you monitor, <em>why</em> it matters, and any specific angles — product names, regions, risk areas, frameworks.
+          After auto-generating, review and add any extra context ScoutForge should focus on.
+        </div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:.74rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Topic Goal <span style="font-weight:400;text-transform:none;letter-spacing:0">(drives auto-generation)</span></div>
+          <div id="skillGoalDisplay" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:9px 12px;font-size:.82rem;color:#374151;line-height:1.55;min-height:2.8em;white-space:pre-wrap">…</div>
+          <div style="font-size:.71rem;color:#9ca3af;margin-top:4px">To update the goal, delete and recreate the topic with a richer description.</div>
+        </div>
+        <p style="font-size:.82rem;color:#6b7280;margin-bottom:8px">
+          Plain-English description of what this topic monitors — shown on the dashboard.
+          Click <strong>✨ Auto Generate</strong> to draft from your goal, then refine and save.
         </p>
-        <textarea id="skillContent" spellcheck="true" style="height:420px;font-family:system-ui,sans-serif;font-size:.84rem;line-height:1.6"></textarea>
+        <textarea id="skillContent" spellcheck="true" style="height:300px;font-family:system-ui,sans-serif;font-size:.84rem;line-height:1.6"></textarea>
         <div id="skillMsg" style="font-size:.78rem;min-height:1.2em;margin-top:8px"></div>
       </div>
 
@@ -1395,9 +1405,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="footModel">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Close</button>
       </div>
-      <div id="footSkill" style="display:none;gap:8px;display:none">
-        <button class="btn btn-danger" onclick="resetSkill()">↺ Reset to Default</button>
+      <div id="footSkill" style="display:none;gap:8px">
         <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+        <button class="btn btn-secondary" id="autoGenSkillBtn" onclick="autoGenerateSkill()">✨ Auto Generate</button>
         <button class="btn btn-primary" onclick="saveSkill()">💾 Save Skill</button>
       </div>
       <div id="footQueries" style="display:none;gap:8px">
@@ -1959,7 +1969,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     // Answer bubble (loading)
     const aDiv=document.createElement('div');
     aDiv.style.cssText='padding:10px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;font-size:.83rem;color:#6b7280;white-space:pre-wrap;line-height:1.6;word-break:break-word;max-width:90%';
-    aDiv.textContent='⟳ Searching with Ollama — 30–60 seconds…';
+    aDiv.textContent='⟳ Working on it…';
     hist.appendChild(aDiv);
     hist.scrollTop=hist.scrollHeight;
     document.getElementById('askInput').value='';
@@ -2114,6 +2124,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     ta.value='Loading...';
     const d=await(await fetch('/api/skill?expl='+EXPL_ID)).json();
     ta.value=d.content||'// Skill file not found';
+    const gc=document.getElementById('skillGoalDisplay');
+    if(gc && gc.textContent==='…'){
+      try{
+        const cd=await(await fetch('/api/topics/'+EXPL_ID+'/config')).json();
+        gc.textContent=cd.description||(cd.goal)||'(No goal set — recreate the topic with a goal description to enable auto-generation)';
+      }catch(e){gc.textContent='(Could not load goal)';}
+    }
   }
 
   async function saveModel(){
@@ -2139,14 +2156,25 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     else{msg.textContent='⚠ '+(d.error||'Unknown');msg.style.color='#dc2626';}
   }
 
-  async function resetSkill(){
-    if(!confirm('Reset skill to original default? Your edits will be lost.'))return;
-    const d=await(await fetch('/api/skill/reset?expl='+EXPL_ID,{method:'POST'})).json();
-    if(d.status==='reset'){
-      document.getElementById('skillContent').value='';
-      document.getElementById('skillMsg').textContent='✔ Reset to default.';
-      document.getElementById('skillMsg').style.color='#16a34a';
-      loadSkillContent();
+  async function autoGenerateSkill(){
+    const btn=document.getElementById('autoGenSkillBtn');
+    const msg=document.getElementById('skillMsg');
+    const ta=document.getElementById('skillContent');
+    if(btn){btn.disabled=true;btn.textContent='⟳ Generating…';}
+    msg.textContent='Generating Skills description from your goal using AI — this takes ~20 seconds…';
+    msg.style.color='#6b7280';
+    try{
+      const d=await(await fetch('/api/skill/autogenerate?expl='+EXPL_ID,{method:'POST'})).json();
+      if(d.error){msg.textContent='⚠ '+d.error;msg.style.color='#dc2626';}
+      else{
+        ta.value=d.content;
+        msg.textContent='✔ Generated! Review and enhance with any extra details you want ScoutForge to focus on, then click Save Skill.';
+        msg.style.color='#16a34a';
+      }
+    }catch(e){
+      msg.textContent='⚠ Error: '+e.message; msg.style.color='#dc2626';
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='✨ Auto Generate';}
     }
   }
 
@@ -2175,7 +2203,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     const aDiv=document.createElement('div');
     aDiv.style.cssText='padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:.83rem;color:#6b7280;white-space:pre-wrap;line-height:1.6;word-break:break-word';
-    aDiv.textContent='⟳ Searching report with Ollama — takes 30–60 seconds...';
+    aDiv.textContent='⟳ Working on it…';
     hist.appendChild(aDiv);
     hist.scrollTop=hist.scrollHeight;
 
@@ -2409,12 +2437,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     list.innerHTML=d.topics.map(t=>`
       <div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6;gap:8px">
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;color:#111827;font-size:.88rem">${t.title}</div>
+          <div style="font-weight:600;color:#111827;font-size:.88rem">${t.title}${t.id==='ai-news'?' <span style="font-size:.68rem;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:10px;padding:1px 7px;font-weight:600">📌 Default</span>':''}</div>
           <div style="font-size:.72rem;color:#9ca3af;font-family:monospace">${t.id}</div>
           ${!t.has_skill?'<span style="font-size:.7rem;color:#f59e0b;font-weight:600">⚠ No skill description set</span>':''}
         </div>
         <a href="?expl=${t.id}" class="btn btn-secondary btn-sm" style="text-decoration:none;flex-shrink:0">Open →</a>
-        <button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="deleteTopic('${t.id}','${t.title.replace(/'/g,"\\'")}')">Delete</button>
+        ${t.id==='ai-news'
+          ?'<span style="font-size:.72rem;color:#9ca3af;padding:0 4px" title="Default topic — cannot be deleted">🔒</span>'
+          :`<button class="btn btn-danger btn-sm" style="flex-shrink:0" onclick="deleteTopic('${t.id}','${t.title.replace(/'/g,"\\'")}')">Delete</button>`}
       </div>`).join('');
   }
 
@@ -2867,6 +2897,35 @@ def api_skill_reset():
     return jsonify({"status": "reset"})
 
 
+@app.route("/api/skill/autogenerate", methods=["POST"])
+def api_skill_autogenerate():
+    expl_id  = request.args.get("expl") or DEFAULT_EXPL_ID or ""
+    expl_cfg = _get_expl(expl_id)
+    if not expl_cfg:
+        return jsonify({"error": "Exploration not found"}), 404
+    cfg_path = expl_cfg.get("_cfg_path")
+    if not cfg_path or not Path(cfg_path).exists():
+        return jsonify({"error": "Config not found"}), 404
+    with open(cfg_path) as f:
+        raw = yaml.safe_load(f)
+    name = raw.get("title", expl_id)
+    goal = (raw.get("description") or "").strip()
+    if not goal:
+        return jsonify({"error": "No goal set for this topic. Delete and recreate the topic with a detailed goal description to enable auto-generation."}), 400
+    try:
+        skill_body = call_ollama(
+            f"You are helping set up a research monitoring agent for the topic: \"{name}\".\n\n"
+            f"The user's goal: {goal}\n\n"
+            f"Write a concise 2–4 sentence plain-English description of what this topic monitors and why it matters. "
+            f"No headings, no bullet points. Just clear prose suitable for an 'About this topic' blurb.",
+            system="You are a research analyst. Return only the description text, nothing else."
+        )
+        return jsonify({"content": skill_body.strip(), "goal": goal})
+    except Exception as e:
+        log.error(f"Skill autogenerate failed for {expl_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/research/topic", methods=["POST"])
 def api_topic_research():
     body    = request.json or {}
@@ -3244,8 +3303,9 @@ def api_topic_config_get(topic_id: str):
         return jsonify({"error": "Topic not found"}), 404
     research = expl_cfg.get("research", {})
     return jsonify({
-        "id":    topic_id,
-        "title": expl_cfg.get("title", topic_id),
+        "id":          topic_id,
+        "title":       expl_cfg.get("title", topic_id),
+        "description": expl_cfg.get("description", ""),
         "report_depth":        expl_cfg.get("report_depth", 1),
         "report_style":        expl_cfg.get("report_style", "summary"),
         "discord_webhook":     expl_cfg.get("discord_webhook", ""),
@@ -3300,6 +3360,8 @@ def api_topic_config_save(topic_id: str):
 
 @app.route("/api/topics/<topic_id>", methods=["DELETE"])
 def api_topics_delete(topic_id: str):
+    if topic_id == "ai-news":
+        return jsonify({"error": "AI News is the default topic and cannot be deleted."}), 403
     if topic_id not in EXPLORATIONS:
         return jsonify({"error": "Topic not found"}), 404
     expl_cfg = EXPLORATIONS[topic_id]

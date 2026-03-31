@@ -1,0 +1,49 @@
+id: ai-news
+title: AI News
+description: Monitor the broader AI field — covering new model releases, research
+  breakthroughs, industry news, startup ecosystem, AI policy and regulation, and
+  developer tools. Tracks everything happening across the full AI landscape.
+
+schedule:
+  frequency: daily
+  hour: 8
+  minute: 0
+  timezone: UTC
+  day_of_week: mon
+  day: 1
+
+report_depth: 2
+report_style: summary
+
+discord_webhook: ''
+discord_auto_notify: false
+
+research:
+  time_range: ''
+  max_age_months: 1
+  dedup_against_last_n_reports: 3
+  topics:
+    - area: AI Models & Research
+      queries:
+        - new AI model releases this week
+        - large language model benchmark results 2025
+        - AI research paper breakthroughs
+        - foundation model capabilities announcements
+    - area: AI Industry & Startups
+      queries:
+        - AI startup funding rounds 2025
+        - AI company product launches news
+        - big tech AI announcements Google Microsoft OpenAI
+        - AI acquisitions partnerships 2025
+    - area: AI Policy & Regulation
+      queries:
+        - AI regulation legislation news 2025
+        - EU AI Act implementation updates
+        - AI ethics governance policy
+        - government AI strategy national policy
+    - area: AI Developer Tools & Frameworks
+      queries:
+        - new AI developer tools frameworks released
+        - LLM inference optimization tools 2025
+        - open source AI projects trending
+        - agentic AI frameworks updates
