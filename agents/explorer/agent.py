@@ -198,7 +198,23 @@ def _article_is_fresh(date_str: str, max_days: int) -> bool:
 
 
 def _max_age_days(expl_cfg: dict) -> int:
-    """Return max article age in days based on the exploration's schedule frequency."""
+    """Return max article age in days.
+
+    Priority:
+      1. research.max_age_months from config, if set and > 0 (user override).
+         0 means no age limit → returns a very large number (10 years).
+      2. Falls back to schedule-frequency-based defaults.
+    """
+    months = expl_cfg.get("research", {}).get("max_age_months")
+    if months is not None:
+        try:
+            m = int(months)
+            if m == 0:
+                return 365 * 10  # 0 = no limit
+            if m > 0:
+                return m * 30
+        except (ValueError, TypeError):
+            pass
     freq = expl_cfg.get("schedule", {}).get("frequency", "daily")
     return _FREQUENCY_MAX_AGE.get(freq, 90)
 
@@ -3700,7 +3716,13 @@ def api_topics_create():
             queries_raw = call_ollama(
                 f"You are configuring a web research agent for the topic: \"{name}\".\n\n"
                 f"The user's goal: {goal}\n\n"
-                f"Generate 3 research areas, each with 4 targeted web search queries.\n\n"
+                f"Generate 3 research areas, each with 4 targeted web search queries that will return real results.\n\n"
+                f"Rules for writing good queries:\n"
+                f"- Use specific keywords a real user would type into Google or DuckDuckGo\n"
+                f"- Include domain-specific terms (e.g. exam boards, institutions, standards bodies)\n"
+                f"- For reference/educational topics, include year ranges or edition indicators\n"
+                f"- For news/current topics, include terms like 'latest', 'announced', '2024', '2025'\n"
+                f"- Avoid vague queries — each query must be distinct and targeted\n\n"
                 f"Return ONLY valid JSON (no markdown, no code fences) in this exact format:\n"
                 f'[{{"area":"Area Name","queries":["query 1","query 2","query 3","query 4"]}}, ...]',
                 system="You are a research query generator. Return only valid JSON. No markdown. No explanation."
@@ -3719,7 +3741,7 @@ def api_topics_create():
         "title": name,
         "description": goal,
         "schedule": {"frequency": "daily", "hour": 8, "minute": 0, "timezone": "UTC", "day_of_week": "mon", "day": 1},
-        "research": {"time_range": "", "max_age_months": 3, "dedup_against_last_n_reports": 2, "topics": ai_topics},
+        "research": {"time_range": "", "max_age_months": 0, "dedup_against_last_n_reports": 2, "topics": ai_topics},
     }
     with open(expl_dir / "config.yaml", "w") as f:
         yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)

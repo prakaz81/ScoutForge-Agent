@@ -1,0 +1,39 @@
+id: 8th-grade-cbse-social-science-subject
+title: 8th grade CBSE Social Science Subject
+description: I want to search previous years Questions and answers for 8th grade CBSE
+  (India) social science subject. last 5 years are ok. i need 1 mark questions report
+  as the outcome.
+schedule:
+  frequency: monthly
+  hour: 8
+  minute: 0
+  timezone: UTC
+  day_of_week: mon
+  day: 1
+research:
+  time_range: ''
+  max_age_months: 0
+  dedup_against_last_n_reports: 2
+  topics:
+  - area: CBSE Class 8 Social Science 1-Mark Questions
+    queries:
+    - CBSE class 8 social science 1 mark questions and answers
+    - CBSE 8th standard social science one mark questions History Geography Civics
+    - class 8 CBSE social science very short answer questions chapter wise
+    - CBSE class 8 SST 1 mark questions with answers PDF
+  - area: CBSE Class 8 Social Science Previous Year Papers
+    queries:
+    - CBSE class 8 social science previous year question papers with solutions
+    - CBSE 8th social science sample paper 2023 2024 with answers
+    - class 8 CBSE social science annual exam question paper last 5 years
+    - CBSE class 8 SST past papers our pasts resources and development social and political life
+  - area: CBSE Class 8 Social Science Chapter-wise Questions
+    queries:
+    - CBSE class 8 history How When and Where 1 mark questions answers
+    - CBSE class 8 geography Resources and Development short questions
+    - CBSE class 8 civics Indian Constitution Social and Political Life questions
+    - NCERT class 8 social science exercise questions answers chapter wise
+report_depth: 1
+report_style: qa
+discord_webhook: ''
+discord_auto_notify: false
