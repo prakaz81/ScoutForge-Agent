@@ -679,14 +679,14 @@ def synthesize_advisory_report(
 - No repetition across sections. Number items within each section starting from 1."""
 
     if depth == 1:
-        # 1-pager: consolidated half-page — NO per-area sections, max 10 bullets total
-        structure = f"""## Summary
-(2–3 short paragraphs. Synthesise the most important developments across ALL research areas into one coherent narrative. Group related themes. Tight, clear prose — no padding, no per-area breakdown.)
+        # 1-pager: Top Highlights first, then Summary derived from those highlights
+        structure = f"""## Top Highlights
+(Exactly 10 bullet points. Each bullet: **[Source] [Date]:** one concise sentence — the single most impactful finding. Cover diverse areas. Most important first. Stop at 10.)
 
 ---
 
-## Top Highlights
-(Exactly 10 bullet points. Each bullet: **[Source] [Date]:** one concise sentence — the single most impactful finding. Cover diverse areas. Most important first. Stop at 10.)
+## Summary
+(2–3 short paragraphs synthesising ONLY the Top Highlights bullets above — not the raw findings. Narrate the key themes and patterns that emerge from those highlights. Tight, clear prose — no padding, no new information not already in the highlights.)
 
 ---
 {_fmt_rules}
