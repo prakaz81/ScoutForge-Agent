@@ -622,7 +622,7 @@ def synthesize_advisory_report(
     max_days = _max_age_days(expl_cfg)
     areas    = [t["area"] for t in expl_cfg.get("research", {}).get("topics", [])]
 
-    # ── Per-area section instructions (same across all depths) ────────
+    # ── Per-area section instructions (depth 2 and 3 only) ───────────
     area_sections = "\n\n".join(
         f"## {area}\n"
         f"(Numbered list. Each item: **[Source] [Date]:** 2–4 line summary. "
@@ -633,21 +633,21 @@ def synthesize_advisory_report(
 
     # ── Depth-specific structure ───────────────────────────────────────
     if depth == 1:
-        structure = f"""## Executive Summary
-(Exactly 6 bullet points. Each bullet: one crisp sentence covering the single most important development. Most impactful first.)
+        # Quick Summary = half-page consolidated brief, NO per-area sections
+        structure = f"""## Summary
+(Write 2–3 short paragraphs — roughly half a page. Synthesise the most important developments across ALL research areas into one coherent, consolidated narrative. Do NOT list items area by area. Group related themes together. Write in tight, clear prose — no padding.)
 
 ---
 
-{area_sections}
+## Top Highlights
+(Exactly 5 bullet points. Each bullet: **[Source] [Date]:** one sentence — the single most impactful finding. Cover different areas. Most important first.)
 
 ---
 FORMATTING RULES:
-- Every item must follow: **[Source] [Date]:** followed by the summary.
+- Bullet format: **[Source] [Date]:** sentence.
 - Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
-- Source: publication name from URL domain (techcrunch.com → TechCrunch). Never use raw URLs.
-- Each summary is 2–3 lines maximum. Be concise.
-- Number items within each section starting from 1.
-- Do not repeat the same news item in multiple sections."""
+- Source: publication name derived from URL domain (techcrunch.com → TechCrunch). Never use raw URLs.
+- No per-area sections. No repetition. Half a page total — be ruthlessly concise."""
 
     elif depth == 2:
         structure = f"""## Executive Summary
@@ -835,13 +835,18 @@ Rules:
 """
 
     else:  # summary (default)
+        brevity_instruction = (
+            "IMPORTANT: This is a Quick Summary (depth 1). Be ruthlessly concise — "
+            "half a page total. Do NOT expand into per-area sections. Synthesise across all topics.\n\n"
+            if depth == 1 else ""
+        )
         prompt = f"""You are a senior analyst and researcher producing a {depth_label} intelligence brief.
 
 Today is {run_time.strftime('%B %d, %Y')}.
 All articles have been pre-filtered to only include news from the last {max_days} days.
 {dedup_note}
 
-SKILLS AND FOCUS:
+{brevity_instruction}SKILLS AND FOCUS:
 {skills}
 
 Below are ONLY the new, unique findings gathered today (duplicates already removed):
