@@ -452,6 +452,7 @@ def call_ollama(prompt: str, system: str = "") -> str:
 # ── Deduplication ─────────────────────────────────────────────────────────────
 
 def load_previous_reports(n: int, reports_dir: Path) -> str:
+    """Load the last N non-empty reports for deduplication context."""
     if not reports_dir.exists():
         return ""
     reports = sorted(reports_dir.glob("*.md"), reverse=True)[:n]
@@ -460,70 +461,82 @@ def load_previous_reports(n: int, reports_dir: Path) -> str:
     combined = ""
     for path in reports:
         content = path.read_text()
-
-        # Skip reports with zero gathered articles to avoid over-deduping from empty runs
         match = re.search(r"\*\*Articles gathered\*\*:\s*(\d+)", content)
         if match and int(match.group(1)) == 0:
             log.info(f"  Skipping empty report for dedup: {path.name}")
             continue
-
         log.info(f"  Loading for dedup: {path.name}")
-        combined += f"\n\n=== PREVIOUS REPORT: {path.name} ===\n{content[:4000]}"
+        combined += f"\n\n=== PREVIOUS REPORT: {path.name} ===\n{content}"
     return combined
 
 
+def _extract_urls_from_reports(previous_content: str) -> set[str]:
+    """Extract all URLs that appeared in previous reports."""
+    return set(re.findall(r"URL:\s*(https?://\S+)", previous_content))
+
+
+def _extract_titles_from_reports(previous_content: str) -> set[str]:
+    """Extract normalised titles from previous reports for fuzzy matching."""
+    titles = re.findall(r"Title:\s*(.+)", previous_content)
+    return {re.sub(r"[^a-z0-9]", "", t.lower())[:60] for t in titles}
+
+
 def extract_covered_topics(previous_content: str) -> str:
-    log.info("Extracting covered topics from previous reports...")
-    return call_ollama(
-        prompt=(
-            "From the research reports below, extract a concise list of specific topics, "
-            "events, announcements, products, startups, companies, and developments already covered.\n"
-            "Format: one item per line, specific and factual.\n"
-            "Examples: 'Microsoft AutoGen 0.4 release', 'Prompt Security $18M Series A', "
-            "'OpenAI Agents SDK launch', 'EU AI Act enforcement April 2025'\n\n"
-            f"{previous_content}"
-        ),
-        system="You are a research deduplication assistant. Be specific and concise."
-    )
+    """Return a dedup context object — URLs and normalised titles seen before."""
+    # We keep this as a string so the call signature is unchanged,
+    # but encode the URL/title sets as a simple newline-delimited list.
+    urls   = _extract_urls_from_reports(previous_content)
+    titles = _extract_titles_from_reports(previous_content)
+    return "\n".join(sorted(urls | titles))
 
 
 def filter_new_findings(findings_block: str, covered_topics: str) -> tuple[str, int, int]:
+    """Remove articles already seen in previous reports.
+
+    Uses deterministic URL + title matching — no LLM call — so dedup is
+    fast, reliable, and not subject to local model quality.
+    """
     if not covered_topics:
         total = findings_block.count("Title:")
         return findings_block, total, 0
-    log.info("Filtering duplicate findings...")
-    filtered = call_ollama(
-        prompt=(
-            "You are filtering research findings to remove duplicates.\n\n"
-            f"ALREADY COVERED IN PREVIOUS REPORTS:\n{covered_topics}\n\n"
-            f"NEW FINDINGS TO EVALUATE:\n{findings_block}\n\n"
-            "Rules:\n"
-            "- KEEP findings that are genuinely new announcements, releases, incidents, or data\n"
-            "- KEEP findings that are meaningful UPDATES to previously covered topics\n"
-            "- REMOVE findings that are the same event/announcement already covered\n"
-            "- Return ONLY the kept findings in the same Title/Date/URL/Content format\n"
-            "- If truly nothing is new, return exactly: NO_NEW_FINDINGS"
-        ),
-        system="You are a research deduplication assistant. Be strict — only keep genuinely new information."
-    )
 
-    original = findings_block.count("Title:")
+    seen_urls   = set(line for line in covered_topics.splitlines() if line.startswith("http"))
+    seen_titles = set(line for line in covered_topics.splitlines() if not line.startswith("http"))
 
-    if not filtered or not filtered.strip():
-        log.warning("Dedup failed or returned empty output; preserving all findings.")
-        return findings_block, original, 0
+    log.info(f"  Dedup index: {len(seen_urls)} URLs, {len(seen_titles)} titles from previous reports")
 
-    if "NO_NEW_FINDINGS" in filtered.upper():
-        log.info("Dedup result indicates no new findings.")
+    # Split findings_block into individual article records
+    # Each record starts with "Title:" and ends before the next "Title:" or end of block
+    records = re.split(r"(?=\nTitle:|\ATitle:)", findings_block)
+    records = [r.strip() for r in records if r.strip()]
+
+    kept_records, skipped = [], 0
+    for record in records:
+        url_match   = re.search(r"URL:\s*(https?://\S+)", record)
+        title_match = re.search(r"Title:\s*(.+)", record)
+        url   = url_match.group(1).strip()   if url_match   else ""
+        title = title_match.group(1).strip() if title_match else ""
+        norm_title = re.sub(r"[^a-z0-9]", "", title.lower())[:60]
+
+        if url and url in seen_urls:
+            log.debug(f"  [DEDUP] Skipping (URL match): {title[:60]}")
+            skipped += 1
+            continue
+        if norm_title and norm_title in seen_titles:
+            log.debug(f"  [DEDUP] Skipping (title match): {title[:60]}")
+            skipped += 1
+            continue
+
+        kept_records.append(record)
+
+    original = len(records) + skipped if not records else len(records)
+    kept     = len(kept_records)
+    log.info(f"  Dedup: {kept} kept, {skipped} removed out of {original} articles")
+
+    if kept == 0:
         return "NO_NEW_FINDINGS", 0, original
 
-    kept = filtered.count("Title:")
-    if kept == 0 and original > 0:
-        log.warning("Dedup returned 0 kept items despite available findings; falling back to original findings.")
-        return findings_block, original, 0
-
-    skipped = max(0, original - kept)
-    return filtered, kept, skipped
+    return "\n\n".join(kept_records), kept, skipped
 
 
 # ── Research Pipeline ─────────────────────────────────────────────────────────
@@ -924,7 +937,7 @@ def run_research(expl_id: str | None = None) -> dict:
         is_first_report  = not bool(previous_content)
 
         log.info(f"[{eid}] Step 3/4: Deduplicating...")
-        _run_status[eid].update({"step": "3/4", "step_label": "Filtering duplicates with Ollama", "step_detail": f"{total_articles} articles gathered"})
+        _run_status[eid].update({"step": "3/4", "step_label": "Deduplicating against previous reports", "step_detail": f"{total_articles} articles gathered"})
         if is_first_report:
             log.info("  No previous reports — all findings are new.")
             filtered, new_count, skipped = findings_block, total_articles, 0
