@@ -291,9 +291,9 @@ Missed runs: 24-hour misfire window — if the container restarts after the sche
 Schedule is in Settings → Schedule tab. Frequencies available: Every 1/2/3/4/6/8 hours, Daily, Weekly, Monthly. Changes take effect immediately. For hourly schedules the time-of-day field is hidden (runs on the interval).
 
 REPORT DEPTH (Settings → Topic Settings)
-- 1-pager (default): Executive summary + per-area findings. Fastest.
-- 2-pager: Adds Key Insights & Takeaways section.
-- 3-pager: Full detail with Key Insights and a Watch List.
+- 1-pager (default): Consolidated half-page summary + 10 top highlights. No per-area breakdown. Fastest.
+- 2-pager: 10-bullet executive summary + 10 per-area findings + Key Insights.
+- 3-pager: 10-bullet executive summary + 20 per-area findings + Key Insights + Watch List.
 
 REPORT STYLES (Settings → Topic Settings)
 - Quick Summary (default): Structured bullet-point intelligence brief with headings and sections.
@@ -632,71 +632,68 @@ def synthesize_advisory_report(
     )
 
     # ── Depth-specific structure ───────────────────────────────────────
+    _fmt_rules = """FORMATTING RULES:
+- Bullet format: **[Source] [Date]:** followed by the content.
+- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
+- Source: publication name from URL domain (techcrunch.com → TechCrunch). Never use raw URLs.
+- No repetition across sections. Number items within each section starting from 1."""
+
     if depth == 1:
-        # Quick Summary = half-page consolidated brief, NO per-area sections
+        # 1-pager: consolidated half-page — NO per-area sections, max 10 bullets total
         structure = f"""## Summary
-(Write 2–3 short paragraphs — roughly half a page. Synthesise the most important developments across ALL research areas into one coherent, consolidated narrative. Do NOT list items area by area. Group related themes together. Write in tight, clear prose — no padding.)
+(2–3 short paragraphs. Synthesise the most important developments across ALL research areas into one coherent narrative. Group related themes. Tight, clear prose — no padding, no per-area breakdown.)
 
 ---
 
 ## Top Highlights
-(Exactly 5 bullet points. Each bullet: **[Source] [Date]:** one sentence — the single most impactful finding. Cover different areas. Most important first.)
+(Exactly 10 bullet points. Each bullet: **[Source] [Date]:** one concise sentence — the single most impactful finding. Cover diverse areas. Most important first. Stop at 10.)
 
 ---
-FORMATTING RULES:
-- Bullet format: **[Source] [Date]:** sentence.
-- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
-- Source: publication name derived from URL domain (techcrunch.com → TechCrunch). Never use raw URLs.
-- No per-area sections. No repetition. Half a page total — be ruthlessly concise."""
+{_fmt_rules}
+- No per-area sections. Total output must fit on one page — be ruthlessly concise."""
 
     elif depth == 2:
+        # 2-pager: executive summary (10) + per-area findings (10 more across areas) + insights
         structure = f"""## Executive Summary
-(Exactly 8 bullet points covering top developments across all domains. Most impactful first.)
+(Exactly 10 bullet points covering the top developments across all domains. Most impactful first.)
 
 ---
 
 {area_sections}
+(Across ALL areas combined, include a total of 10 additional findings — distribute them across the areas that have the most relevant content. Skip areas with nothing new.)
 
 ---
 
 ## Key Insights & Takeaways
-(6 numbered, actionable insights drawn from the findings above. What does this mean? What trends are emerging?)
+(5 numbered, actionable insights drawn from the findings above. What trends are emerging? What does this mean?)
 
 ---
-FORMATTING RULES:
-- Every item must follow: **[Source] [Date]:** followed by the summary.
-- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
-- Source: publication name from URL domain. Never use raw URLs.
-- Each summary is 2–4 lines. No padding, no repetition.
-- Number items within each section starting from 1.
-- Do not repeat the same item in multiple sections."""
+{_fmt_rules}
+- Each finding summary: 2–3 lines maximum. Total output fits in 2 pages."""
 
     else:  # depth == 3
+        # 3-pager: executive summary (10) + per-area findings (20 more) + insights + watch list
         structure = f"""## Executive Summary
-(10 bullet points covering the most significant developments across all domains. Most impactful first.)
+(Exactly 10 bullet points covering the most significant developments. Most impactful first.)
 
 ---
 
 {area_sections}
+(Across ALL areas combined, include a total of 20 findings — distribute across areas with the most relevant content. Skip areas with nothing new.)
 
 ---
 
 ## Key Insights & Takeaways
-(8 numbered, actionable insights. What does this mean strategically? What trends or patterns are emerging?)
+(8 numbered, actionable insights. Strategic implications, trends, patterns emerging from the data.)
 
 ---
 
 ## Watch List — Signals to Monitor
-(5 specific early signals or upcoming events to track closely over the next 1–2 weeks. Be concrete and actionable.)
+(5 specific signals or upcoming events to track over the next 1–2 weeks. Be concrete.)
 
 ---
-FORMATTING RULES:
-- Every item must follow: **[Source] [Date]:** followed by the summary.
-- Date format: Mon DD, YYYY (e.g. Mar 27, 2026).
-- Source: publication name from URL domain. Never use raw URLs.
-- Each summary is 2–4 lines. No padding, no repetition.
-- Number items within each section starting from 1.
-- Do not repeat the same item in multiple sections."""
+{_fmt_rules}
+- Each finding summary: 2–4 lines. Total output fits in 3 pages."""
 
     depth_label = {1: "1-page compact", 2: "2-page brief", 3: "3-page detailed"}[depth]
     style_label = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}[style]
@@ -705,7 +702,7 @@ FORMATTING RULES:
 
     # ── Style-specific prompts ────────────────────────────────────────
     if style == "qa":
-        qa_count = {1: 6, 2: 10, 3: 14}[depth]
+        qa_count = {1: 10, 2: 20, 3: 30}[depth]
         prompt = f"""You are a senior analyst producing a {depth_label} Q&A intelligence brief.
 
 Today is {run_time.strftime('%B %d, %Y')}.
@@ -741,7 +738,7 @@ Rules:
 """
 
     elif style == "blog":
-        section_count = {1: 3, 2: 5, 3: 7}[depth]
+        section_count = {1: 2, 2: 4, 3: 6}[depth]
         prompt = f"""You are a senior technology journalist writing a {depth_label} blog post.
 
 Today is {run_time.strftime('%B %d, %Y')}.
@@ -788,7 +785,7 @@ Rules:
 """
 
     elif style == "story":
-        chapter_count = {1: 3, 2: 5, 3: 7}[depth]
+        chapter_count = {1: 2, 2: 4, 3: 6}[depth]
         prompt = f"""You are a master storyteller and technology journalist. Transform these research findings into a gripping narrative — told as a story, not a report.
 
 Today is {run_time.strftime('%B %d, %Y')}.
@@ -1348,9 +1345,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div>
             <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Scheduled Report Depth</label>
             <select id="topicReportDepth" style="max-width:220px">
-              <option value="1">1-pager — compact summary (default)</option>
-              <option value="2">2-pager — summary + key insights</option>
-              <option value="3">3-pager — full detail + watch list</option>
+              <option value="1">1-pager — half-page summary + 10 highlights (default)</option>
+              <option value="2">2-pager — 10 top + 10 per-area + insights</option>
+              <option value="3">3-pager — 10 top + 20 per-area + insights + watch list</option>
             </select>
             <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Controls how detailed the scheduled research brief is. Deeper reports take longer to generate.</div>
           </div>
@@ -1822,9 +1819,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
             <div style="font-weight:700;color:#111827;margin-bottom:6px">Report depth (⚙️ Settings → ⚙ Topic Settings)</div>
             <ul style="list-style:disc;padding-left:18px;display:flex;flex-direction:column;gap:2px">
-              <li><strong>1-pager</strong> (default) — Executive summary + per-area findings. Fastest.</li>
-              <li><strong>2-pager</strong> — Adds Key Insights &amp; Takeaways.</li>
-              <li><strong>3-pager</strong> — Full detail with Key Insights and a Watch List.</li>
+              <li><strong>1-pager</strong> (default) — Consolidated half-page summary + 10 top highlights. No per-area breakdown. Fastest.</li>
+              <li><strong>2-pager</strong> — 10-bullet executive summary + 10 per-area findings + Key Insights.</li>
+              <li><strong>3-pager</strong> — 10-bullet executive summary + 20 per-area findings + Key Insights + Watch List.</li>
             </ul>
           </div>
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px">
