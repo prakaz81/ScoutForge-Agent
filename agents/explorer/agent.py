@@ -3891,13 +3891,16 @@ def _send_discord(webhook_url: str, content: str) -> dict:
 
 
 def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
-    """Build a Discord-friendly summary from a report file."""
-    title  = expl_cfg.get("title", expl_cfg.get("id", "ScoutForge"))
-    style  = expl_cfg.get("report_style", "summary")
-    text   = report_path.read_text()
-    lines  = text.splitlines()
+    """Build the full Discord message for a report.
 
-    # Detect style from header if config not set
+    Returns the complete report body prefixed with a header line.
+    _send_discord handles splitting into Discord's 2000-char message chunks.
+    """
+    title = expl_cfg.get("title", expl_cfg.get("id", "ScoutForge"))
+    style = expl_cfg.get("report_style", "summary")
+    text  = report_path.read_text()
+
+    # Detect style from report header in case config is stale
     if "**Style**: Q&A" in text:
         style = "qa"
     elif "**Style**: Blog Post" in text:
@@ -3908,41 +3911,21 @@ def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
     style_icon = {"summary": "📋", "qa": "❓", "blog": "📝", "story": "📖"}.get(style, "📋")
     style_name = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}.get(style, "Quick Summary")
 
+    # Strip the Markdown metadata header (first 4 lines: title, date, model line, articles line, ---)
+    # so Discord gets clean readable content rather than raw Markdown front-matter
+    body_lines = text.splitlines()
+    # Skip lines until past the "---" separator
+    past_sep = False
+    body_start = 0
+    for i, line in enumerate(body_lines):
+        if line.strip() == "---":
+            past_sep = True
+            body_start = i + 1
+            break
+    body = "\n".join(body_lines[body_start:]).strip() if past_sep else text.strip()
+
     header = f"**📡 ScoutForge — {title}** · {style_icon} {style_name}\n**Report:** `{report_path.name}`\n\n"
-
-    if style == "qa":
-        # Extract first 3 Q&A pairs
-        pairs, current = [], []
-        for line in lines:
-            if line.startswith("### Q") and current:
-                pairs.append("\n".join(current)); current = []
-            current.append(line)
-        if current:
-            pairs.append("\n".join(current))
-        excerpt = "\n\n".join(pairs[:3])
-    elif style == "blog":
-        # Extract intro paragraphs (skip metadata lines)
-        body = [l for l in lines if l and not l.startswith("**") and not l.startswith("#")]
-        excerpt = "\n".join(body[:12])
-    elif style == "story":
-        # Extract prologue / first chapter
-        body = [l for l in lines if l and not l.startswith("**") and not l.startswith("*Published")]
-        excerpt = "\n".join(body[:14])
-    else:
-        # Extract executive summary bullets
-        in_exec = False
-        bullets = []
-        for line in lines:
-            if "Executive Summary" in line:
-                in_exec = True; continue
-            if in_exec:
-                if line.startswith("---") or (line.startswith("##") and "Executive" not in line):
-                    break
-                if line.strip():
-                    bullets.append(line)
-        excerpt = "\n".join(bullets[:10])
-
-    return (header + excerpt)[:1900]
+    return header + body
 
 
 @app.route("/api/reports/<expl_id>/<filename>/discord", methods=["POST"])
