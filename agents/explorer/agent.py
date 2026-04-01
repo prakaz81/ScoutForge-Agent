@@ -599,10 +599,18 @@ def synthesize_advisory_report(
 ) -> str:
 
     if "NO_NEW_FINDINGS" in filtered_findings or new_count == 0:
+        if total_found == 0:
+            return (
+                "## No Articles Found\n\n"
+                "The search returned no results for this run. This can happen when:\n"
+                "- The search time range is too narrow (try switching to 'Past month' or 'All time' in Settings → Topic Settings)\n"
+                "- The research queries need refinement (review them in Settings → Research Queries)\n"
+                "- SearXNG temporarily returned no results — try running again\n"
+            )
         return (
             "## No New Developments This Period\n\n"
-            f"All {total_found} findings gathered were already covered in previous reports.\n"
-            "No new report content generated. Check back tomorrow or expand the search time range in config.yaml.\n"
+            f"All {total_found} articles gathered were already covered in your previous reports.\n"
+            "Try running again later, or adjust the search time range and queries in Settings.\n"
         )
 
     dedup_note = (
@@ -863,7 +871,8 @@ def save_report(
     reports_dir.mkdir(parents=True, exist_ok=True)
     title    = expl_cfg.get("title", expl_cfg["id"])
     topics   = expl_cfg.get("research", {}).get("topics", [])
-    time_range = expl_cfg.get("research", {}).get("time_range", "") or "no filter"
+    _time_range_labels = {"day": "Past 24 hours", "week": "Past week", "month": "Past month", "year": "Past year"}
+    time_range = _time_range_labels.get(expl_cfg.get("research", {}).get("time_range", ""), "All time")
     slug     = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")[:30]
     filename = f"research_brief_{slug}_{run_time.strftime('%Y%m%d_%H%M%S')}.md"
     filepath = reports_dir / filename
@@ -1355,14 +1364,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
           </div>
           <div>
-            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Time Range Filter</label>
-            <input type="text" id="topicTimeRange" placeholder="e.g. past year, 2025 — leave blank for no filter" style="max-width:360px">
-            <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Passed to SearXNG to filter search results by time.</div>
+            <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Search Time Range</label>
+            <select id="topicTimeRange" style="max-width:260px">
+              <option value="">All time (no filter)</option>
+              <option value="day">Past 24 hours</option>
+              <option value="week">Past week</option>
+              <option value="month">Past month</option>
+              <option value="year">Past year</option>
+            </select>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Filters SearXNG search results by recency. Use "All time" for reference or educational topics.</div>
           </div>
           <div>
             <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Max Article Age (months)</label>
-            <input type="number" id="topicMaxAge" min="1" max="24" style="width:100px">
-            <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Articles older than this are filtered out before synthesis.</div>
+            <input type="number" id="topicMaxAge" min="0" max="120" style="width:100px" placeholder="0 = no limit">
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:4px">Articles older than this are filtered before synthesis. Set to 0 for no age limit.</div>
           </div>
           <div>
             <label style="font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Dedup Against Last N Reports</label>
@@ -2676,8 +2691,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const r=d.research||{};
     document.getElementById('topicReportDepth').value=d.report_depth||1;
     document.getElementById('topicReportStyle').value=d.report_style||'summary';
-    document.getElementById('topicTimeRange').value=r.time_range||'';
-    document.getElementById('topicMaxAge').value=r.max_age_months||3;
+    // Normalise legacy freetext values to valid dropdown options
+    const rawRange = (r.time_range||'').toLowerCase().trim();
+    const validRanges = ['day','week','month','year'];
+    document.getElementById('topicTimeRange').value = validRanges.includes(rawRange) ? rawRange : '';
+    document.getElementById('topicMaxAge').value = r.max_age_months !== undefined ? r.max_age_months : 0;
     document.getElementById('topicDedup').value=r.dedup_against_last_n_reports||2;
     document.getElementById('discordWebhook').value=d.discord_webhook||'';
     document.getElementById('discordAutoNotify').checked=!!d.discord_auto_notify;
