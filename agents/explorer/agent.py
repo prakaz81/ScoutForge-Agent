@@ -471,20 +471,30 @@ def load_previous_reports(n: int, reports_dir: Path) -> str:
 
 
 def _extract_urls_from_reports(previous_content: str) -> set[str]:
-    """Extract all URLs that appeared in previous reports."""
-    return set(re.findall(r"URL:\s*(https?://\S+)", previous_content))
+    """Extract URLs from the hidden dedup-index sections in previous reports."""
+    # Primary: read from <!-- dedup-index --> blocks written by save_report
+    index_urls: set[str] = set()
+    for block in re.findall(r"<!-- dedup-index\n(.*?)-->", previous_content, re.DOTALL):
+        for line in block.splitlines():
+            line = line.strip()
+            if line.startswith("http"):
+                index_urls.add(line)
+    return index_urls
 
 
 def _extract_titles_from_reports(previous_content: str) -> set[str]:
-    """Extract normalised titles from previous reports for fuzzy matching."""
-    titles = re.findall(r"Title:\s*(.+)", previous_content)
-    return {re.sub(r"[^a-z0-9]", "", t.lower())[:60] for t in titles}
+    """Extract normalised titles from the hidden dedup-index sections."""
+    index_titles: set[str] = set()
+    for block in re.findall(r"<!-- dedup-index\n(.*?)-->", previous_content, re.DOTALL):
+        for line in block.splitlines():
+            line = line.strip()
+            if line and not line.startswith("http"):
+                index_titles.add(re.sub(r"[^a-z0-9]", "", line.lower())[:60])
+    return index_titles
 
 
 def extract_covered_topics(previous_content: str) -> str:
-    """Return a dedup context object — URLs and normalised titles seen before."""
-    # We keep this as a string so the call signature is unchanged,
-    # but encode the URL/title sets as a simple newline-delimited list.
+    """Return a dedup context string — URLs and normalised titles seen before."""
     urls   = _extract_urls_from_reports(previous_content)
     titles = _extract_titles_from_reports(previous_content)
     return "\n".join(sorted(urls | titles))
@@ -882,6 +892,7 @@ def save_report(
     skipped: int,
     reports_dir: Path,
     expl_cfg: dict,
+    all_findings: list | None = None,
 ) -> Path:
     reports_dir.mkdir(parents=True, exist_ok=True)
     title    = expl_cfg.get("title", expl_cfg["id"])
@@ -901,7 +912,27 @@ def save_report(
         f"**Model**: {OLLAMA_MODEL} | **Style**: {style_label} | **Depth**: {depth_label} | **Topics**: {len(topics)} domains | **Search range**: {time_range}\n"
         f"**Articles gathered**: {total} | **Unique new**: {new} | **Duplicates removed**: {skipped}\n\n---\n\n"
     )
-    filepath.write_text(header + content)
+    # Append a hidden URL + title index used by the dedup engine on future runs.
+    # Invisible in the rendered report — only parsed by load_previous_reports.
+    url_index = ""
+    if all_findings:
+        urls   = []
+        titles = []
+        for area in all_findings:
+            for f in area.get("findings", []):
+                if f.get("url"):
+                    urls.append(f["url"])
+                if f.get("title"):
+                    titles.append(f["title"])
+        if urls or titles:
+            url_index = (
+                "\n\n<!-- dedup-index\n"
+                + "\n".join(urls)
+                + ("\n" if titles else "")
+                + "\n".join(titles)
+                + "\n-->"
+            )
+    filepath.write_text(header + content + url_index)
     log.info(f"Report saved → {filepath}")
     return filepath
 
@@ -954,7 +985,7 @@ def run_research(expl_id: str | None = None) -> dict:
         _run_status[eid].update({"step": "4/4", "step_label": f"Synthesising {style_label} ({depth_label}) with Ollama", "step_detail": f"{new_count} unique findings → generating report"})
         body     = synthesize_advisory_report(filtered, run_time, total_articles, new_count, skipped, is_first_report, expl_cfg, depth, style)
         _run_status[eid].update({"step_label": "Saving report...", "step_detail": ""})
-        filepath = save_report(body, run_time, total_articles, new_count, skipped, reports_dir, expl_cfg)
+        filepath = save_report(body, run_time, total_articles, new_count, skipped, reports_dir, expl_cfg, all_findings)
 
         _run_status[eid] = {
             "status": "success", "timestamp": run_time.isoformat(),
