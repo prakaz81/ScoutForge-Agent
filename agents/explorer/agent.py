@@ -3947,20 +3947,15 @@ def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
         excerpt = "\n".join(body[:6])
 
     else:
-        # summary: extract Top Highlights bullets (up to 5)
-        in_section, bullets = False, []
-        for line in lines:
-            if "Top Highlights" in line or "Executive Summary" in line:
-                in_section = True
-                continue
-            if in_section:
-                if line.startswith("---") or (line.startswith("##") and len(bullets) > 0):
-                    break
-                if line.strip():
-                    bullets.append(line)
-                    if len(bullets) >= 5:
-                        break
-        excerpt = "\n".join(bullets)
+        # summary: send the full report body (Summary + Top Highlights).
+        # The 1-pager is designed to be concise — it fits in one Discord message.
+        # Skip past the first "---" separator to drop the metadata header.
+        body_start = 0
+        for i, line in enumerate(lines):
+            if line.strip() == "---":
+                body_start = i + 1
+                break
+        excerpt = "\n".join(lines[body_start:]).strip()
 
     return (header + excerpt)[:1990]
 
