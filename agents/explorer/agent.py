@@ -3878,25 +3878,25 @@ def api_topics_delete(topic_id: str):
 
 
 def _send_discord(webhook_url: str, content: str) -> dict:
-    """POST a message to a Discord webhook. Splits into ≤2000-char chunks."""
+    """POST a single message to a Discord webhook (max 2000 chars)."""
     if not webhook_url:
         return {"error": "No webhook URL configured"}
-    chunks = [content[i:i+1990] for i in range(0, len(content), 1990)]
-    for chunk in chunks:
-        try:
-            r = requests.post(webhook_url, json={"content": chunk}, timeout=10)
-            if r.status_code not in (200, 204):
-                return {"error": f"Discord returned HTTP {r.status_code}: {r.text[:200]}"}
-        except Exception as e:
-            return {"error": str(e)}
-    return {"status": "sent", "chunks": len(chunks)}
+    # Hard-cap at 1990 chars — Discord limit is 2000
+    payload = content[:1990]
+    try:
+        r = requests.post(webhook_url, json={"content": payload}, timeout=10)
+        if r.status_code not in (200, 204):
+            return {"error": f"Discord returned HTTP {r.status_code}: {r.text[:200]}"}
+    except Exception as e:
+        return {"error": str(e)}
+    return {"status": "sent"}
 
 
 def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
-    """Build the full Discord message for a report.
+    """Build a single concise Discord notification for a completed report.
 
-    Returns the complete report body prefixed with a header line.
-    _send_discord handles splitting into Discord's 2000-char message chunks.
+    Sends one message: header + the Top Highlights / executive summary bullets
+    extracted from the report. The full report remains in ScoutForge.
     """
     title = expl_cfg.get("title", expl_cfg.get("id", "ScoutForge"))
     style = expl_cfg.get("report_style", "summary")
@@ -3913,21 +3913,56 @@ def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
     style_icon = {"summary": "📋", "qa": "❓", "blog": "📝", "story": "📖"}.get(style, "📋")
     style_name = {"summary": "Quick Summary", "qa": "Q&A", "blog": "Blog Post", "story": "Story"}.get(style, "Quick Summary")
 
-    # Strip the Markdown metadata header (first 4 lines: title, date, model line, articles line, ---)
-    # so Discord gets clean readable content rather than raw Markdown front-matter
-    body_lines = text.splitlines()
-    # Skip lines until past the "---" separator
-    past_sep = False
-    body_start = 0
-    for i, line in enumerate(body_lines):
-        if line.strip() == "---":
-            past_sep = True
-            body_start = i + 1
+    # Extract metadata from header for the notification line
+    articles_line = ""
+    for line in text.splitlines():
+        if line.startswith("**Articles gathered**"):
+            articles_line = line.strip()
             break
-    body = "\n".join(body_lines[body_start:]).strip() if past_sep else text.strip()
 
-    header = f"**📡 ScoutForge — {title}** · {style_icon} {style_name}\n**Report:** `{report_path.name}`\n\n"
-    return header + body
+    header = (
+        f"**📡 ScoutForge — {title}** · {style_icon} {style_name}\n"
+        f"`{report_path.name}`"
+        + (f" · {articles_line}" if articles_line else "")
+        + "\n\n"
+    )
+
+    lines = text.splitlines()
+
+    if style == "qa":
+        # First Q&A pair
+        in_pair, collected = False, []
+        for line in lines:
+            if line.startswith("### Q1"):
+                in_pair = True
+            if in_pair:
+                collected.append(line)
+                if line.startswith("---") and len(collected) > 2:
+                    break
+        excerpt = "\n".join(collected[:8])
+
+    elif style in ("blog", "story"):
+        # First non-metadata paragraph
+        body = [l for l in lines if l.strip() and not l.startswith("**") and not l.startswith("#") and not l.startswith("*Published") and l.strip() != "---"]
+        excerpt = "\n".join(body[:6])
+
+    else:
+        # summary: extract Top Highlights bullets (up to 5)
+        in_section, bullets = False, []
+        for line in lines:
+            if "Top Highlights" in line or "Executive Summary" in line:
+                in_section = True
+                continue
+            if in_section:
+                if line.startswith("---") or (line.startswith("##") and len(bullets) > 0):
+                    break
+                if line.strip():
+                    bullets.append(line)
+                    if len(bullets) >= 5:
+                        break
+        excerpt = "\n".join(bullets)
+
+    return (header + excerpt)[:1990]
 
 
 @app.route("/api/reports/<expl_id>/<filename>/discord", methods=["POST"])
