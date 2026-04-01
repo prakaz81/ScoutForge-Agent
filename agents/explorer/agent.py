@@ -556,8 +556,16 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
     time_range = expl_cfg.get("research", {}).get("time_range", "")
     max_days   = _max_age_days(expl_cfg)
     expl_id    = expl_cfg["id"]
+    depth      = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
 
-    all_findings = []
+    # Cap total articles gathered based on report depth.
+    # More depth = more content needed; but quality > quantity at all levels.
+    # Distributed evenly across areas so no single area dominates.
+    total_cap   = {1: 20, 2: 40, 3: 60}[depth]
+    per_area_cap = max(2, total_cap // max(len(topics), 1))
+
+    all_findings  = []
+    total_kept    = 0
     total = len(topics)
     for idx, topic in enumerate(topics, 1):
         area = topic["area"]
@@ -567,7 +575,13 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
         skipped_old      = 0
         skipped_injection = 0
         for query in topic["queries"]:
+            if len(area_findings) >= per_area_cap:
+                break  # enough for this area
+            if total_kept >= total_cap:
+                break  # global cap reached
             for r in search(query, time_range=time_range):
+                if len(area_findings) >= per_area_cap or total_kept >= total_cap:
+                    break
                 date_str = r.get("publishedDate", "")
                 if not _article_is_fresh(date_str, max_days):
                     skipped_old += 1
@@ -588,12 +602,15 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
                     _log_guardrail_event(article, reason)
                     continue
                 area_findings.append(article)
+                total_kept += 1
         all_findings.append({"area": area, "findings": area_findings})
         log.info(
             f"    → {len(area_findings)} articles kept, "
             f"{skipped_old} skipped (age), "
             f"{skipped_injection} blocked (injection)"
+            f" [cap: {per_area_cap}/area, {total_cap} total]"
         )
+    log.info(f"  Total gathered across all areas: {total_kept} (depth={depth}, cap={total_cap})")
     return all_findings
 
 
