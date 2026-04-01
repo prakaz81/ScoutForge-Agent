@@ -549,6 +549,59 @@ def filter_new_findings(findings_block: str, covered_topics: str) -> tuple[str, 
     return "\n\n".join(kept_records), kept, skipped
 
 
+# ── Grounding / Relevance Check ───────────────────────────────────────────────
+
+def _topic_keywords(expl_cfg: dict, area: str, query: str) -> set[str]:
+    """Build a set of lowercase keywords from the exploration title, description,
+    area name, and the current query.  Used by _is_relevant() to score articles."""
+    stopwords = {
+        "a","an","the","and","or","of","in","on","at","to","for","is","are","was",
+        "were","with","by","from","this","that","these","those","it","its","be",
+        "been","as","about","into","than","but","not","no","can","will","how",
+        "what","when","where","who","which","their","has","have","had","new",
+        "latest","update","updates","report","reports","news","top","key",
+    }
+    sources = [
+        expl_cfg.get("title", ""),
+        expl_cfg.get("description", ""),
+        area,
+        query,
+    ]
+    tokens: set[str] = set()
+    for src in sources:
+        for tok in re.split(r"[^a-zA-Z0-9]+", src.lower()):
+            if len(tok) > 2 and tok not in stopwords:
+                tokens.add(tok)
+    return tokens
+
+
+def _is_relevant(article: dict, topic_kws: set[str], threshold: float = 0.30) -> bool:
+    """Return True if the article is sufficiently relevant to the topic keywords.
+
+    Scores keyword overlap between (article title + first 500 chars of content)
+    and *topic_kws*.  If overlap < *threshold* (default 30 %) the article is
+    considered off-topic and should be skipped.
+
+    A low threshold (30 %) avoids over-filtering while still catching articles
+    that share almost no vocabulary with the topic — the "70 % match" requested
+    by the user translates to "reject when fewer than 30 % of topic keywords
+    appear in the article".
+    """
+    if not topic_kws:
+        return True  # nothing to compare against → let it through
+
+    text = f"{article.get('title', '')} {article.get('content', '')[:500]}".lower()
+    article_tokens = set(re.split(r"[^a-zA-Z0-9]+", text))
+    overlap = len(topic_kws & article_tokens)
+    score = overlap / len(topic_kws)
+    if score < threshold:
+        log.debug(
+            f"  [GROUNDING] rejected (score={score:.2f}): {article.get('title','')[:80]}"
+        )
+        return False
+    return True
+
+
 # ── Research Pipeline ─────────────────────────────────────────────────────────
 
 def gather_findings(expl_cfg: dict) -> list[dict]:
@@ -574,12 +627,14 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
         area = topic["area"]
         log.info(f"  Researching: {area}")
         _run_status.setdefault(expl_id, {})["step_detail"] = f"Domain {idx}/{total}: {area}"
-        area_findings    = []
-        skipped_old      = 0
+        area_findings     = []
+        skipped_old       = 0
         skipped_injection = 0
+        skipped_offtopic  = 0
         for query in topic["queries"]:
             if total_kept >= total_cap:
                 break  # global cap reached
+            topic_kws = _topic_keywords(expl_cfg, area, query)
             for r in search(query, time_range=time_range):
                 if total_kept >= total_cap:
                     break
@@ -607,13 +662,17 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
                     skipped_injection += 1
                     _log_guardrail_event(article, reason)
                     continue
+                if not _is_relevant(article, topic_kws):
+                    skipped_offtopic += 1
+                    continue
                 area_findings.append(article)
                 total_kept += 1
         all_findings.append({"area": area, "findings": area_findings})
         log.info(
             f"    → {len(area_findings)} articles kept, "
             f"{skipped_old} skipped (age), "
-            f"{skipped_injection} blocked (injection)"
+            f"{skipped_injection} blocked (injection), "
+            f"{skipped_offtopic} filtered (off-topic)"
             f" [per_query_cap: {per_query_cap}, total_cap: {total_cap}]"
         )
     log.info(f"  Total gathered: {total_kept} (depth={depth}, cap={total_cap}, {total_queries} queries)")
