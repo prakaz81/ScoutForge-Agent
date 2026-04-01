@@ -559,10 +559,13 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
     depth      = max(1, min(3, int(expl_cfg.get("report_depth", 1))))
 
     # Cap total articles gathered based on report depth.
-    # More depth = more content needed; but quality > quantity at all levels.
-    # Distributed evenly across areas so no single area dominates.
+    # Divide evenly across total query count — not areas — so topics with
+    # fewer queries still get their fair share, and single-query topics
+    # aren't limited to 1-2 results.
     total_cap   = {1: 20, 2: 40, 3: 60}[depth]
-    per_area_cap = max(2, total_cap // max(len(topics), 1))
+    total_queries = sum(len(t.get("queries", [])) for t in topics)
+    per_query_cap = max(1, round(total_cap / max(total_queries, 1)))
+    log.info(f"  Article caps — total: {total_cap}, queries: {total_queries}, per query: {per_query_cap}")
 
     all_findings  = []
     total_kept    = 0
@@ -575,12 +578,14 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
         skipped_old      = 0
         skipped_injection = 0
         for query in topic["queries"]:
-            if len(area_findings) >= per_area_cap:
-                break  # enough for this area
             if total_kept >= total_cap:
                 break  # global cap reached
             for r in search(query, time_range=time_range):
-                if len(area_findings) >= per_area_cap or total_kept >= total_cap:
+                if total_kept >= total_cap:
+                    break
+                # Per-query cap: stop fetching more results for this query once reached
+                query_articles = sum(1 for a in area_findings if a.get("_query") == query)
+                if query_articles >= per_query_cap:
                     break
                 date_str = r.get("publishedDate", "")
                 if not _article_is_fresh(date_str, max_days):
@@ -595,6 +600,7 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
                     "url":     url,
                     "content": content or snippet,
                     "date":    date_str,
+                    "_query":  query,  # used for per-query cap tracking; not written to report
                 }
                 rejected, reason = screen_article(article)
                 if rejected:
@@ -608,9 +614,9 @@ def gather_findings(expl_cfg: dict) -> list[dict]:
             f"    → {len(area_findings)} articles kept, "
             f"{skipped_old} skipped (age), "
             f"{skipped_injection} blocked (injection)"
-            f" [cap: {per_area_cap}/area, {total_cap} total]"
+            f" [per_query_cap: {per_query_cap}, total_cap: {total_cap}]"
         )
-    log.info(f"  Total gathered across all areas: {total_kept} (depth={depth}, cap={total_cap})")
+    log.info(f"  Total gathered: {total_kept} (depth={depth}, cap={total_cap}, {total_queries} queries)")
     return all_findings
 
 
