@@ -1340,7 +1340,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <div class="report-actions">
               <button class="btn-icon" title="View report" onclick="window.open('/reports/{{ active_expl_id }}/{{ r }}','_blank')">📄</button>
               <button class="btn-icon" title="Ask question about this report" onclick="openReportAsk('{{ r }}')">💬</button>
-              <button class="btn-icon" title="Send to Discord" onclick="sendToDiscord('{{ r }}', this)" style="color:#5865f2"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></button>
+              <button class="btn-icon" title="Send to Discord" onclick="openDiscordModal('{{ r }}')" style="color:#5865f2"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg></button>
               <button class="btn-icon" title="Delete report" onclick="deleteReport('{{ r }}')">🗑</button>
             </div>
           </li>
@@ -2206,6 +2206,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 </div>
 
+<!-- ── Discord Send Modal ────────────────────────────────────────── -->
+<div class="overlay" id="discordSendModal">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <span style="color:#5865f2;font-size:1.1rem">Send to Discord</span>
+      <button class="modal-close" onclick="closeDiscordModal()">✕</button>
+    </div>
+    <div style="padding:18px 20px">
+      <div style="font-size:.78rem;color:#6b7280;margin-bottom:4px">Webhook URL</div>
+      <input id="discordSendWebhook" type="text" placeholder="https://discord.com/api/webhooks/…"
+        style="width:100%;box-sizing:border-box;font-family:monospace;font-size:.75rem;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;margin-bottom:6px">
+      <div id="discordSendMsg" style="font-size:.76rem;min-height:18px;margin-bottom:12px"></div>
+      <div id="discordSendFilename" style="display:none"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" onclick="discordModalTest()">Test Connection</button>
+        <button class="btn btn-primary btn-sm" id="discordSendBtn" onclick="discordModalSend()">Send Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Adhoc Search Modal ─────────────────────────────────────────── -->
 <div class="overlay" id="adhocSearchModal">
   <div class="modal" style="max-width:700px">
@@ -2616,17 +2637,58 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     document.getElementById('reportAskInput').focus();
   }
 
-  // ── Discord ───────────────────────────────────────────────────────
-  async function sendToDiscord(filename, btn){
-    const orig=btn.textContent;
-    btn.textContent='⟳'; btn.disabled=true;
+  // ── Discord Send Modal ────────────────────────────────────────────
+  function openDiscordModal(filename){
+    document.getElementById('discordSendFilename').textContent = filename;
+    document.getElementById('discordSendMsg').textContent = '';
+    document.getElementById('discordSendMsg').style.color = '#6b7280';
+    // Pre-populate with stored webhook if available
+    const stored = (document.getElementById('discordWebhook')||{}).value || '';
+    document.getElementById('discordSendWebhook').value = stored;
+    document.getElementById('discordSendBtn').disabled = false;
+    document.getElementById('discordSendBtn').textContent = 'Send Report';
+    document.getElementById('discordSendModal').classList.add('open');
+  }
+
+  function closeDiscordModal(){
+    document.getElementById('discordSendModal').classList.remove('open');
+  }
+
+  async function discordModalTest(){
+    const url = document.getElementById('discordSendWebhook').value.trim();
+    const msg = document.getElementById('discordSendMsg');
+    if(!url){ msg.style.color='#dc2626'; msg.textContent='Enter a webhook URL first.'; return; }
+    msg.style.color='#6b7280'; msg.textContent='Testing…';
     try{
-      const r=await fetch('/api/reports/'+EXPL_ID+'/'+encodeURIComponent(filename)+'/discord',{method:'POST'});
-      const d=await r.json();
-      if(d.error){ alert('Discord send failed: '+d.error); }
-      else{ btn.textContent='✔'; setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},2000); return; }
-    }catch(e){ alert('Discord send failed: '+e.message); }
-    btn.textContent=orig; btn.disabled=false;
+      const d = await(await fetch('/api/discord/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({webhook_url:url,expl_id:EXPL_ID})})).json();
+      if(d.status==='sent'){ msg.style.color='#16a34a'; msg.textContent='✔ Connection successful!'; }
+      else{ msg.style.color='#dc2626'; msg.textContent='✘ '+(d.error||'Test failed'); }
+    }catch(e){ msg.style.color='#dc2626'; msg.textContent='✘ '+e.message; }
+  }
+
+  async function discordModalSend(){
+    const url      = document.getElementById('discordSendWebhook').value.trim();
+    const filename = document.getElementById('discordSendFilename').textContent;
+    const msg      = document.getElementById('discordSendMsg');
+    const btn      = document.getElementById('discordSendBtn');
+    if(!url){ msg.style.color='#dc2626'; msg.textContent='Enter a webhook URL first.'; return; }
+    btn.disabled=true; btn.textContent='Sending…'; msg.textContent=''; msg.style.color='#6b7280';
+    try{
+      const d = await(await fetch('/api/reports/'+EXPL_ID+'/'+encodeURIComponent(filename)+'/discord',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({webhook_url:url})
+      })).json();
+      if(d.status==='sent'){
+        msg.style.color='#16a34a'; msg.textContent='✔ Sent successfully!';
+        btn.textContent='Sent ✔';
+        setTimeout(closeDiscordModal, 1500);
+      } else {
+        msg.style.color='#dc2626'; msg.textContent='✘ '+(d.error||'Send failed');
+        btn.disabled=false; btn.textContent='Send Report';
+      }
+    }catch(e){
+      msg.style.color='#dc2626'; msg.textContent='✘ '+e.message;
+      btn.disabled=false; btn.textContent='Send Report';
+    }
   }
 
   async function testDiscordWebhook(){
@@ -4091,9 +4153,11 @@ def api_report_send_discord(expl_id: str, filename: str):
     expl_cfg = EXPLORATIONS.get(expl_id) or _get_expl(expl_id)
     if not expl_cfg:
         return jsonify({"error": "Topic not found"}), 404
-    webhook_url = expl_cfg.get("discord_webhook", "").strip()
+    # Allow caller to supply a one-off webhook URL (not saved); fall back to stored config
+    body        = request.get_json(silent=True) or {}
+    webhook_url = body.get("webhook_url", "").strip() or expl_cfg.get("discord_webhook", "").strip()
     if not webhook_url:
-        return jsonify({"error": "No Discord webhook configured for this topic. Go to ⚙️ Settings → Topic Settings to add one."}), 400
+        return jsonify({"error": "No Discord webhook URL provided. Enter one in the send dialog or save one in Settings → Topic Settings."}), 400
     content = _discord_summary(filepath, expl_cfg)
     result  = _send_discord(webhook_url, content)
     log.info(f"Discord send [{expl_id}/{filename}]: {result}")
