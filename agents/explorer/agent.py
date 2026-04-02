@@ -4021,7 +4021,9 @@ def _discord_summary(report_path: Path, expl_cfg: dict) -> str:
     """
     title = expl_cfg.get("title", expl_cfg.get("id", "ScoutForge"))
     style = expl_cfg.get("report_style", "summary")
-    text  = report_path.read_text()
+    # Strip the hidden dedup-index block so it never leaks into Discord
+    raw   = report_path.read_text()
+    text  = raw.split("<!-- dedup-index")[0].rstrip()
 
     # Detect style from report header in case config is stale
     if "**Style**: Q&A" in text:
