@@ -2638,16 +2638,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   }
 
   // ── Discord Send Modal ────────────────────────────────────────────
-  function openDiscordModal(filename){
+  async function openDiscordModal(filename){
     document.getElementById('discordSendFilename').textContent = filename;
-    document.getElementById('discordSendMsg').textContent = '';
-    document.getElementById('discordSendMsg').style.color = '#6b7280';
-    // Pre-populate with stored webhook if available
-    const stored = (document.getElementById('discordWebhook')||{}).value || '';
-    document.getElementById('discordSendWebhook').value = stored;
+    document.getElementById('discordSendMsg').textContent = 'Loading…';
+    document.getElementById('discordSendMsg').style.color = '#9ca3af';
+    document.getElementById('discordSendWebhook').value = '';
     document.getElementById('discordSendBtn').disabled = false;
     document.getElementById('discordSendBtn').textContent = 'Send Report';
     document.getElementById('discordSendModal').classList.add('open');
+    // Fetch stored webhook from config (may not be loaded yet)
+    try{
+      const d = await(await fetch('/api/topics/'+EXPL_ID+'/config')).json();
+      const stored = d.discord_webhook || '';
+      document.getElementById('discordSendWebhook').value = stored;
+      document.getElementById('discordSendMsg').textContent = stored ? '' : 'No webhook saved — paste one below.';
+      document.getElementById('discordSendMsg').style.color = '#9ca3af';
+    }catch(e){
+      document.getElementById('discordSendMsg').textContent = '';
+    }
   }
 
   function closeDiscordModal(){
