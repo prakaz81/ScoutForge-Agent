@@ -2210,19 +2210,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <div class="overlay" id="discordSendModal">
   <div class="modal modal-sm">
     <div class="modal-head">
-      <span style="color:#5865f2;font-size:1.1rem">Send to Discord</span>
-      <button class="modal-close" onclick="closeDiscordModal()">✕</button>
+      <h3>🔔 Send to Discord</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('discordSendModal')">✕ Close</button>
     </div>
-    <div style="padding:18px 20px">
-      <div style="font-size:.78rem;color:#6b7280;margin-bottom:4px">Webhook URL</div>
+    <div class="modal-body">
+      <div id="discordSendReportName" style="font-family:monospace;font-size:.75rem;color:#475569;margin-bottom:12px;word-break:break-all"></div>
+      <div style="font-size:.78rem;font-weight:600;color:#374151;margin-bottom:4px">Webhook URL</div>
       <input id="discordSendWebhook" type="text" placeholder="https://discord.com/api/webhooks/…"
-        style="width:100%;box-sizing:border-box;font-family:monospace;font-size:.75rem;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;margin-bottom:6px">
-      <div id="discordSendMsg" style="font-size:.76rem;min-height:18px;margin-bottom:12px"></div>
+        style="width:100%;box-sizing:border-box;font-family:monospace;font-size:.75rem;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;margin-bottom:4px">
+      <div style="font-size:.72rem;color:#9ca3af;margin-bottom:10px">Pre-filled from saved settings. Paste a different URL to send to another channel — it won't be saved.</div>
+      <div id="discordSendMsg" style="font-size:.76rem;min-height:18px;margin-bottom:4px"></div>
       <div id="discordSendFilename" style="display:none"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-secondary btn-sm" onclick="discordModalTest()">Test Connection</button>
-        <button class="btn btn-primary btn-sm" id="discordSendBtn" onclick="discordModalSend()">Send Report</button>
-      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('discordSendModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="discordModalTest()">🔔 Test Connection</button>
+      <button class="btn btn-primary" id="discordSendBtn" onclick="discordModalSend()">📤 Send Report</button>
     </div>
   </div>
 </div>
@@ -2640,26 +2643,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   // ── Discord Send Modal ────────────────────────────────────────────
   async function openDiscordModal(filename){
     document.getElementById('discordSendFilename').textContent = filename;
-    document.getElementById('discordSendMsg').textContent = 'Loading…';
-    document.getElementById('discordSendMsg').style.color = '#9ca3af';
+    document.getElementById('discordSendReportName').textContent = filename;
+    document.getElementById('discordSendMsg').textContent = '';
+    document.getElementById('discordSendMsg').style.color = '#6b7280';
     document.getElementById('discordSendWebhook').value = '';
     document.getElementById('discordSendBtn').disabled = false;
-    document.getElementById('discordSendBtn').textContent = 'Send Report';
-    document.getElementById('discordSendModal').classList.add('open');
-    // Fetch stored webhook from config (may not be loaded yet)
+    document.getElementById('discordSendBtn').textContent = '📤 Send Report';
+    openModal('discordSendModal');
+    // Fetch stored webhook from config
     try{
       const d = await(await fetch('/api/topics/'+EXPL_ID+'/config')).json();
-      const stored = d.discord_webhook || '';
-      document.getElementById('discordSendWebhook').value = stored;
-      document.getElementById('discordSendMsg').textContent = stored ? '' : 'No webhook saved — paste one below.';
-      document.getElementById('discordSendMsg').style.color = '#9ca3af';
-    }catch(e){
-      document.getElementById('discordSendMsg').textContent = '';
-    }
-  }
-
-  function closeDiscordModal(){
-    document.getElementById('discordSendModal').classList.remove('open');
+      document.getElementById('discordSendWebhook').value = d.discord_webhook || '';
+    }catch(e){}
   }
 
   async function discordModalTest(){
@@ -2688,7 +2683,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       if(d.status==='sent'){
         msg.style.color='#16a34a'; msg.textContent='✔ Sent successfully!';
         btn.textContent='Sent ✔';
-        setTimeout(closeDiscordModal, 1500);
+        setTimeout(()=>closeModal('discordSendModal'), 1500);
       } else {
         msg.style.color='#dc2626'; msg.textContent='✘ '+(d.error||'Send failed');
         btn.disabled=false; btn.textContent='Send Report';
